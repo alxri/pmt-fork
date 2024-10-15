@@ -1,20 +1,24 @@
-#include <algorithm>
 #include <cassert>
-#include <iostream>
+#include <cerrno>
 #include <iterator>
 #include <memory>
-#include <stdexcept>
 #include <cstring>
-#include <sstream>
-#include <cerrno>
+#include <stdexcept>
+#include <algorithm>
+#include <utility>
+#include <filesystem>
 #include <system_error>
 
-#include <errno.h>
-#include <ext/alloc_traits.h>
+#include <charconv>
+
 #include <sched.h>
 #include <unistd.h>
 
+#include <fmt/core.h>
+#include <fmt/ostream.h>
+
 #include "RaplImpl.h"
+#include "fmt/base.h"
 
 /*
  * RAPL (Running Average Power Limit) is an API provided by Intel for power
@@ -41,85 +45,91 @@ RaplImpl::RaplImpl() {
 }
 
 std::string GetBasename(int package_id) {
-  return std::string("/sys/class/powercap/intel-rapl:" +
-                     std::to_string(package_id));
+  return fmt::format("/sys/class/powercap/intel-rapl:{0}", package_id);
 }
 
-template <typename T>
-bool ReadFile(const std::string& filename, T& destination) {
-  T temp1;
-  T temp2;
-  while (true) {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-#if defined(DEBUG)
-      std::cerr << "Could not open " << filename << std::endl;
-#endif
-      return false;
-    } else {
-      file >> temp1;
-      file.seekg(0);
-      file >> temp2;
-      if (temp1 == temp2) {
-        destination = temp1;
-        return true;
-      }
+std::string read_string(int fd) {
+  std::string result;
+  std::array<std::byte, 256> buffer;
+  const std::size_t read_size = os::pread(fd, buffer, 0);
+  result.reserve(read_size);
+  for (std::size_t i = 0; i < read_size; ++i) {
+    const char c = static_cast<char>(buffer[i]);
+    if (!std::isspace(c) && c != '\n') {
+      result.push_back(c);
     }
   }
+  return result;
+}
+
+template <typename Numeric>
+Numeric read_numerical_value(int fd) {
+  Numeric value = 0;
+  std::array<std::byte, 256> buffer;
+  const std::size_t read_size = os::pread(fd, buffer, 0);
+  std::from_chars_result res = std::from_chars(
+      static_cast<const char*>(static_cast<void*>(buffer.data())),
+      static_cast<const char*>(static_cast<void*>(buffer.data() + read_size)),
+      value);
+  if (res.ec == std::errc::invalid_argument &&
+      res.ec == std::errc::result_out_of_range) {
+    throw std::runtime_error("Unable to parse file to numerical value");
+  }
+  return value;
 }
 
 void RaplImpl::Init() {
-  for (std::size_t i = 0; i < kNumRaplDomains; i++) {
-    std::string basename = GetBasename(i);
+  try {
+    for (std::size_t i = 0; i < kNumRaplDomains; i++) {
+      try {
+        std::string basename = GetBasename(i);
 
-    // Read domain name
-    const std::string filename_domain = basename + "/name";
-    std::string package_id;
+        if (!std::filesystem::exists(basename)) {
+          break;
+        }
 
-    bool valid = ReadFile(filename_domain, package_id);
+        const os::file_descriptor fd_rapl_dir = os::opendir(basename);
+        const os::file_descriptor name_fd =
+            os::openat(fd_rapl_dir.fd(), "name");
 
-    // Read max energy
-    const std::string filename_max_energy = basename + "/max_energy_range_uj";
-    std::size_t max_energy_range_uj = 0;
-    if (valid) {
-      valid &= ReadFile(filename_max_energy, max_energy_range_uj);
+        // Read domain name
+        const std::string package_id = read_string(name_fd.fd());
+
+        const os::file_descriptor max_energy_fd =
+            os::openat(fd_rapl_dir.fd(), "max_energy_range_uj");
+        std::size_t max_energy_range_uj =
+            read_numerical_value<std::size_t>(max_energy_fd.fd());
+
+        os::file_descriptor energy_uj_fd =
+            os::openat(fd_rapl_dir.fd(), "energy_uj");
+        std::ignore = read_numerical_value<std::size_t>(energy_uj_fd.fd());
+
+        packages_names_.push_back(package_id);
+        uj_max_.push_back(max_energy_range_uj);
+        energy_fds_.emplace_back(std::move(energy_uj_fd));
+      } catch (std::system_error& e) {
+        fmt::print(stderr, "OS error: {0}\n", e.what());
+        if (e.code().value() == EACCES) {
+          fmt::print(stderr,
+                     "Please check the permission or try to run as 'root'\n");
+        }
+      }
     }
 
-    // Read energy
-    const std::string filename_energy = basename + "/energy_uj";
-
-    // test access right
-    const int access_ret_code = ::access(filename_energy.c_str(), R_OK);
-    if (valid && access_ret_code != 0) {
-      std::ostringstream ss;
-      ss << "Unable to access '" << filename_domain
-         << "' : " << ::strerror(errno) << "\n"
-         << "Please check the permission or try to run as 'root'";
-      throw std::runtime_error(ss.str());
+    // Initialize state variables
+    const std::size_t n = uj_max_.size();
+    uj_first_.resize(n);
+    uj_previous_.resize(n);
+    uj_offset_.resize(n);
+    std::vector<RaplMeasurement> measurements = GetMeasurements();
+    for (std::size_t i = 0; i < n; i++) {
+      uj_first_[i] = measurements[i].joules;
+      uj_previous_[i] = uj_first_[i];
+      uj_offset_[i] = 0;
     }
 
-    if (valid) {
-      std::size_t energy_uj = 0;
-      valid &= ReadFile(filename_energy, energy_uj);
-    }
-
-    if (valid) {
-      packages_names_.push_back(package_id);
-      uj_max_.push_back(max_energy_range_uj);
-      file_names_.push_back(filename_energy);
-    }
-  }
-
-  // Initialize state variables
-  const std::size_t n = uj_max_.size();
-  uj_first_.resize(n);
-  uj_previous_.resize(n);
-  uj_offset_.resize(n);
-  std::vector<RaplMeasurement> measurements = GetMeasurements();
-  for (std::size_t i = 0; i < n; i++) {
-    uj_first_[i] = measurements[i].joules;
-    uj_previous_[i] = uj_first_[i];
-    uj_offset_[i] = 0;
+  } catch (std::exception& e) {
+    fmt::print(stderr, "Unable to init rapl plugin: {0}", e.what());
   }
 }
 
@@ -129,22 +139,17 @@ std::vector<RaplMeasurement> RaplImpl::GetMeasurements() {
   std::vector<RaplMeasurement> measurements;
 
   const std::size_t n = packages_names_.size();
-  assert(n == file_names_.size());
+  assert(n == energy_fds_.size());
   assert(n == uj_max_.size());
 
-  auto file_name = file_names_.begin();
-  auto packages_name = packages_names_.begin();
-
   // Take all measurements
-  for (std::size_t i = 0; i < n; i++) {
+  auto packages_name_it = packages_names_.begin();
+  for (const auto& energy_fd : energy_fds_) {
     std::size_t measurement;
-    if (!ReadFile(*file_name, measurement)) {
-      throw std::runtime_error("Could not open " + *file_name);
-    }
-    measurements.push_back({*packages_name, measurement});
-
-    file_name = std::next(file_name);
-    packages_name = std::next(packages_name);
+    const std::size_t energy_value =
+        read_numerical_value<std::size_t>(energy_fd.fd());
+    measurements.emplace_back(RaplMeasurement{*packages_name_it, energy_value});
+    packages_name_it++;
   }
 
   for (std::size_t i = 0; i < measurements.size(); i++) {

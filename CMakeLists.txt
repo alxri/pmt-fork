@@ -13,15 +13,12 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 # Set CXX Standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Set debug print info
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
-
-# Enable OpenMP
-find_package(OpenMP REQUIRED)
 
 # Enable PThreads
 find_package(Threads REQUIRED)
@@ -44,9 +41,10 @@ option(PMT_BUILD_XILINX "" OFF)
 option(PMT_BUILD_NVIDIA "" OFF)
 option(PMT_BUILD_BINARY "" OFF)
 
+include(FetchContent)
+
 if(${PMT_BUILD_NVML} OR ${PMT_BUILD_TEGRA})
   set(PMT_BUILD_NVIDIA ON)
-  include(FetchContent)
   find_package(CUDAToolkit REQUIRED)
   FetchContent_Declare(
     cudawrappers
@@ -54,6 +52,13 @@ if(${PMT_BUILD_NVML} OR ${PMT_BUILD_TEGRA})
     GIT_TAG main)
   FetchContent_MakeAvailable(cudawrappers)
 endif()
+
+# fetch libfmt
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+  GIT_TAG 11.0.2)
+FetchContent_MakeAvailable(fmt)
 
 # Config file
 configure_file(${PROJECT_SOURCE_DIR}/cmake/config/pmt.h.in

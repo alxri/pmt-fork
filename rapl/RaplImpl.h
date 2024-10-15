@@ -8,6 +8,7 @@
 
 #include "Rapl.h"
 #include "common/PMT.h"
+#include "common/io.h"
 
 namespace pmt::rapl {
 
@@ -30,13 +31,15 @@ class RaplImpl : public Rapl {
 
  private:
   void Init();
+  std::vector<int> fd_energy_uj_;
+
   std::vector<RaplMeasurement> GetMeasurements();
 
   double previous_timestamp_;
   std::vector<RaplMeasurement> previous_measurements_;
 
   std::vector<std::string> packages_names_;
-  std::vector<std::string> file_names_;
+  std::vector<os::file_descriptor> energy_fds_;
 
   // The numbers in the rapl /energy_uj files range from zero up to a maximum
   // specified in /max_energy_range_uj. This class reports monotonically

@@ -2,6 +2,7 @@
 #define PMT_RAPL_H_
 
 #include <memory>
+#include <string>
 
 #include "common/PMT.h"
 
