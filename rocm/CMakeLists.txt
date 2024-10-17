@@ -17,6 +17,7 @@ add_sensor(
   ROCM.h
   SRC_FILES
   ROCM.cpp
+  ROCMImpl.cpp
   LINK_LIBRARIES
   ${LINK_LIBRARIES}
   INCLUDE_DIRECTORIES
