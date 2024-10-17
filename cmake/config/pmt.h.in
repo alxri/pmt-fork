@@ -4,6 +4,7 @@
 #cmakedefine PMT_BUILD_POWERSENSOR2
 #cmakedefine PMT_BUILD_POWERSENSOR3
 #cmakedefine PMT_BUILD_NVML
+#cmakedefine PMT_BUILD_AMDSMI
 #cmakedefine PMT_BUILD_ROCM
 #cmakedefine PMT_BUILD_RAPL
 #cmakedefine PMT_BUILD_TEGRA
@@ -21,6 +22,9 @@
 #endif
 #if defined(PMT_BUILD_NVML)
 #include <pmt/NVML.h>
+#endif
+#if defined(PMT_BUILD_AMDSMI)
+#include <pmt/AMDSMI.h>
 #endif
 #if defined(PMT_BUILD_ROCM)
 #include <pmt/ROCM.h>

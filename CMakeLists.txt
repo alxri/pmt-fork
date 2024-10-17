@@ -36,6 +36,7 @@ option(PMT_BUILD_POWERSENSOR3 "" OFF)
 option(PMT_BUILD_PYTHON "" OFF)
 option(PMT_BUILD_RAPL "" OFF)
 option(PMT_BUILD_ROCM "" OFF)
+option(PMT_BUILD_AMDSMI "" OFF)
 option(PMT_BUILD_TEGRA "" OFF)
 option(PMT_BUILD_XILINX "" OFF)
 option(PMT_BUILD_NVIDIA "" OFF)
@@ -104,6 +105,7 @@ set(PMT_COMPONENTS
     python
     rapl
     rocm
+    amdsmi
     xilinx
     likwid
     nvidia

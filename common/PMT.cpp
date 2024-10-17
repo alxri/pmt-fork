@@ -174,6 +174,11 @@ std::unique_ptr<PMT> Create(const std::string &name, int argument) {
     return nvidia::NVIDIA::Create(argument);
   }
 #endif
+#if defined(PMT_BUILD_AMDSMI)
+  if (name == amdsmi::AMDSMI::name) {
+    return amdsmi::AMDSMI::Create(argument);
+  }
+#endif
 #if defined(PMT_BUILD_ROCM)
   if (name == rocm::ROCM::name) {
     return rocm::ROCM::Create(argument);
