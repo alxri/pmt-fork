@@ -1,6 +1,6 @@
 project(pmt-rapl)
 
-set(LINK_LIBRARIES Threads::Threads fmt-header-only)
+set(LINK_LIBRARIES Threads::Threads)
 
 add_sensor(
   SENSOR_NAME

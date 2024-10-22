@@ -1,10 +1,13 @@
 #include <cassert>
 #include <cerrno>
+#include <iostream>
 #include <iterator>
 #include <memory>
 #include <cstring>
+#include <sstream>
 #include <stdexcept>
 #include <algorithm>
+#include <string>
 #include <utility>
 #include <filesystem>
 #include <system_error>
@@ -14,11 +17,7 @@
 #include <sched.h>
 #include <unistd.h>
 
-#include <fmt/core.h>
-#include <fmt/ostream.h>
-
 #include "RaplImpl.h"
-#include "fmt/base.h"
 
 /*
  * RAPL (Running Average Power Limit) is an API provided by Intel for power
@@ -45,7 +44,9 @@ RaplImpl::RaplImpl() {
 }
 
 std::string GetBasename(int package_id) {
-  return fmt::format("/sys/class/powercap/intel-rapl:{0}", package_id);
+  std::stringstream basename;
+  basename << "/sys/class/powercap/intel-rapl:" << package_id;
+  return basename.str();
 }
 
 std::string read_string(int fd) {
@@ -108,10 +109,12 @@ void RaplImpl::Init() {
         uj_max_.push_back(max_energy_range_uj);
         energy_fds_.emplace_back(std::move(energy_uj_fd));
       } catch (std::system_error& e) {
-        fmt::print(stderr, "OS error: {0}\n", e.what());
+        std::stringstream message;
+        message << "OS error: " << e.what();
+        std::cerr << message.str() << std::endl;
         if (e.code().value() == EACCES) {
-          fmt::print(stderr,
-                     "Please check the permission or try to run as 'root'\n");
+          std::cerr << "Please check the permission or try to run as 'root'"
+                    << std::endl;
         }
       }
     }
@@ -129,7 +132,9 @@ void RaplImpl::Init() {
     }
 
   } catch (std::exception& e) {
-    fmt::print(stderr, "Unable to init rapl plugin: {0}", e.what());
+    std::stringstream message;
+    message << "Unable to init rapl plugin: " << e.what();
+    std::cerr << message.str() << std::endl;
   }
 }
 

@@ -3,13 +3,12 @@
 
 #include <memory>
 #include <span>
+#include <sstream>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-
-#include <fmt/format.h>
 
 namespace pmt {
 
@@ -48,9 +47,10 @@ inline file_descriptor opendir(const std::string& filename) {
         // interrupted system call
         continue;
       }
+      std::stringstream message;
+      message << "opendir fail for '" << filename << "'";
       throw std::system_error(
-          std::make_error_code(static_cast<std::errc>(errcode)),
-          fmt::format("opendir fail for '{0}'", filename));
+          std::make_error_code(static_cast<std::errc>(errcode)), message.str());
     }
     return file_descriptor(fd);
   }
@@ -65,9 +65,10 @@ inline file_descriptor openat(int dirfd, const std::string& filename) {
         // interrupted system call
         continue;
       }
+      std::stringstream message;
+      message << "open fail for '" << filename << "'";
       throw std::system_error(
-          std::make_error_code(static_cast<std::errc>(errcode)),
-          fmt::format("open fail for '{0}'", filename));
+          std::make_error_code(static_cast<std::errc>(errcode)), message.str());
     }
     return file_descriptor(fd);
   }
@@ -86,8 +87,7 @@ inline size_t pread(int fd, const std::span<std::byte>& byte,
         continue;
       }
       throw std::system_error(
-          std::make_error_code(static_cast<std::errc>(errcode)),
-          fmt::format("<pread>"));
+          std::make_error_code(static_cast<std::errc>(errcode)), "<pread>");
     }
     return static_cast<std::size_t>(data_read);
   }

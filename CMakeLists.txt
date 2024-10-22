@@ -54,13 +54,6 @@ if(${PMT_BUILD_NVML} OR ${PMT_BUILD_TEGRA})
   FetchContent_MakeAvailable(cudawrappers)
 endif()
 
-# fetch libfmt
-FetchContent_Declare(
-  fmt
-  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-  GIT_TAG 11.0.2)
-FetchContent_MakeAvailable(fmt)
-
 # Config file
 configure_file(${PROJECT_SOURCE_DIR}/cmake/config/pmt.h.in
                ${PROJECT_BINARY_DIR}/pmt.h)
