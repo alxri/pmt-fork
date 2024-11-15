@@ -1,12 +1,7 @@
 #include <nvml.h>
-#include <cuda.h>
 
 #include "NVML.h"
 #include "common/PMT.h"
-
-#if (CUDA_VERSION <= 12000)
-#define PMT_NVML_LEGACY_MODE
-#endif
 
 namespace nvml {
 class Context;
