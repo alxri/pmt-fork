@@ -125,7 +125,8 @@ std::vector<pmt::tegra::TegraMeasurement> ReadPowerMeasurements(
   std::vector<pmt::tegra::TegraMeasurement> measurements;
 
   std::vector<std::regex> regexes;
-  regexes.emplace_back("(\\w+) (\\d+)mW\\/(\\d+)mW");  // Xavier
+  regexes.emplace_back(
+      "(\\w+) (\\d+)mW\\/(\\d+)mW");  // Jetson AGX Xavier and Jetson Orin Nano
   regexes.emplace_back("(POM_\\w+) (\\d+)\\/(\\d+)");  // Jetson Nano
 
   for (std::regex& regex : regexes) {
@@ -206,6 +207,8 @@ const std::vector<std::string> sensors_agx_orin{
     "VDD_GPU_SOC", "VDD_CPU_CV", "VIN_SYS_5V0", "VDDQ_VDD2_1V8AO"};
 const std::vector<std::string> sensors_jetson_nano{"POM_5V_IN", "POM_5V_GPU",
                                                    "POM_5V_CPU"};
+const std::vector<std::string> sensors_jetson_orin_nano{
+    "VDD_IN", "VDD_CPU_GPU_CV", "VDD_SOC"};
 
 TegraState::operator State() {
   State state(1 + measurements.size());
@@ -233,17 +236,21 @@ TegraState TegraImpl::GetTegraState() {
   // Which individual measurements to use differs per platform.
   state.watt_ = 0;
   if (detail::CheckSensors(sensors_agx_xavier, state.measurements)) {
-    // AGX Xavier: sum all sensors
+    // Jetson AGX Xavier: sum all sensors
     for (auto& measurement : state.measurements) {
       state.watt_ += measurement.second;
     }
   } else if (detail::CheckSensors(sensors_agx_orin, state.measurements)) {
-    // AGX Orin: sum all sensors
+    // Jetson AGX Orin: sum all sensors
     for (auto& measurement : state.measurements) {
       state.watt_ += measurement.second;
     }
   } else if (detail::CheckSensors(sensors_jetson_nano, state.measurements)) {
     // Jetson Nano: POM_5V_IN only
+    state.watt_ += state.measurements[0].second;
+  } else if (detail::CheckSensors(sensors_jetson_orin_nano,
+                                  state.measurements)) {
+    // Jetson Nano: VDD_IN only
     state.watt_ += state.measurements[0].second;
   }
 
