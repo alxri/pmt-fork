@@ -2,7 +2,7 @@
 #define LIKWID_PMT_H
 
 #include <memory>
-#include <string>
+#include <string_view>
 
 #include "common/PMT.h"
 
@@ -10,7 +10,7 @@ namespace pmt {
 namespace likwid {
 class Likwid : public PMT {
  public:
-  inline static std::string name = "likwid";
+  constexpr static inline std::string_view name = "likwid";
 
   static std::unique_ptr<Likwid> Create(
       std::string event_group_name = default_event_group());

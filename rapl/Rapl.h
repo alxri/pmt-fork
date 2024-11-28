@@ -2,14 +2,14 @@
 #define PMT_RAPL_H_
 
 #include <memory>
-#include <string>
+#include <string_view>
 
 #include "common/PMT.h"
 
 namespace pmt::rapl {
 class Rapl : public PMT {
  public:
-  inline static std::string name = "rapl";
+  constexpr static inline std::string_view name = "rapl";
   static std::unique_ptr<Rapl> Create();
 };
 }  // end namespace pmt::rapl

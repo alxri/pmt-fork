@@ -3,7 +3,7 @@
 
 #include <cstddef>
 #include <memory>
-#include <string>
+#include <string_view>
 
 #include "common/PMT.h"
 
@@ -17,7 +17,7 @@ struct CrayMeasurement {
 
 class Cray : public PMT {
  public:
-  inline static std::string Cray::name = "cray";
+  constexpr static inline std::string_view Cray::name = "cray";
   static std::unique_ptr<Cray> Create();
 };
 }  // end namespace cray

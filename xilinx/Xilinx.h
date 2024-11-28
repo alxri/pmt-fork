@@ -4,12 +4,12 @@
 #include "common/PMT.h"
 
 #include <memory>
-#include <string>
+#include <string_view>
 
 namespace pmt::xilinx {
 class Xilinx : public PMT {
  public:
-  inline static std::string name = "xilinx";
+  constexpr static inline std::string_view name = "xilinx";
   static std::unique_ptr<Xilinx> Create(
       const char *device = default_device().c_str());
   static std::string default_device() {

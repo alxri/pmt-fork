@@ -2,14 +2,14 @@
 #define PMT_ROCM_H_
 
 #include <memory>
-#include <string>
+#include <string_view>
 
 #include "common/PMT.h"
 
 namespace pmt::rocm {
 class ROCM : public PMT {
  public:
-  inline static std::string name = "rocm";
+  constexpr static inline std::string_view name = "rocm";
   static std::unique_ptr<ROCM> Create(int device_number = 0);
 };
 }  // end namespace pmt::rocm
