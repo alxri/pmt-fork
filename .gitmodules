@@ -1,6 +1,3 @@
 [submodule "powersensor2/PowerSensor2"]
 	path = powersensor2/PowerSensor2
 	url = https://git.astron.nl/RD/PowerSensor2
-[submodule "powersensor3/PowerSensor3"]
-	path = powersensor3/PowerSensor3
-	url = https://github.com/nlesc-recruit/PowerSensor3
