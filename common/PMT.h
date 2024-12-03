@@ -57,8 +57,8 @@ class PMT {
   void StartDump(const char *filename = nullptr);
   void StopDump();
 
-  void Mark(const State &start, const State &current, const char *name = 0,
-            unsigned tag = 0) const;
+  virtual void Mark(const State &start, const State &current,
+                    const std::string &message) const;
 
   virtual int GetMeasurementInterval() = 0;  // in milliseconds
   virtual float GetDumpInterval();           // in seconds
@@ -70,7 +70,7 @@ class PMT {
 
   virtual const char *GetDumpFilename() = 0;
 
-  void Dump(const State &start, const State &first, const State &second);
+  void Dump(const State &start, const State &second);
 
   static double GetTime();
 
@@ -92,6 +92,7 @@ class PMT {
 
   void DumpHeader(const State &state);
 
+ protected:
   std::unique_ptr<std::ofstream> dump_file_ = nullptr;
   mutable std::mutex dump_file_mutex_;
 };

@@ -49,13 +49,13 @@ float State::watts(int i) {
 
 void PMT::StartThread() {
   thread_ = std::thread([&] {
-    const State start = GetState();
-    assert(start.nr_measurements_ > 0);
-    State previous = start;
-    state_latest_ = start;
+    const State state_start = GetState();
+    assert(state_start.nr_measurements_ > 0);
+    State state_previous = state_start;
+    state_latest_ = state_start;
 
     if (dump_file_) {
-      DumpHeader(start);
+      DumpHeader(state_start);
     }
 
     const int measurement_interval =
@@ -69,10 +69,10 @@ void PMT::StartThread() {
           std::chrono::milliseconds(measurement_interval));
       state_latest_ = GetState();
 
-      const float duration = seconds(previous, state_latest_);
+      const float duration = seconds(state_previous, state_latest_);
       if (dump_file_ && duration > dumpInterval) {
-        Dump(start, previous, state_latest_);
-        previous = state_latest_;
+        Dump(state_start, state_latest_);
+        state_previous = state_latest_;
       }
     }
   });
@@ -112,7 +112,7 @@ void PMT::DumpHeader(const State &state) {
   }
 }
 
-void PMT::Dump(const State &start, const State &first, const State &second) {
+void PMT::Dump(const State &start, const State &second) {
   if (dump_file_ != nullptr) {
     std::unique_lock<std::mutex> lock(dump_file_mutex_);
     *dump_file_ << std::fixed << std::setprecision(3) << seconds(start, second);
@@ -123,12 +123,12 @@ void PMT::Dump(const State &start, const State &first, const State &second) {
   }
 }
 
-void PMT::Mark(const State &start, const State &current, const char *name,
-               unsigned tag) const {
+void PMT::Mark(const State &start, const State &current,
+               const std::string &message) const {
   if (dump_file_ != nullptr) {
     std::unique_lock<std::mutex> lock(dump_file_mutex_);
-    *dump_file_ << "M " << current.timestamp_ - start.timestamp_ << ' ' << tag
-                << " \"" << (name == nullptr ? "" : name) << '"' << std::endl;
+    *dump_file_ << "M " << seconds(start, current) << " \"" << message << "\""
+                << std::endl;
   }
 }
 
