@@ -5,13 +5,51 @@
 #include <stdexcept>
 #include <string>
 
+#include <cxxopts.hpp>
+
 #include <pmt.h>
 
-void run(pmt::PMT& sensor, int argc, char* argv[]) {
+cxxopts::Options create_commandline_parser(char* argv[]) {
+  cxxopts::Options options(argv[0]);
+
+  options.add_options()("n,name", "Name (required)",
+                        cxxopts::value<std::string>())(
+      "d,device", "Device (optional)",
+      cxxopts::value<std::string>()->default_value("default_device"))(
+      "command", "Command (optional)",
+      cxxopts::value<std::vector<std::string>>()->default_value({}))(
+      "h,help", "Print usage");
+  options.parse_positional({"command"});
+
+  return options;
+}
+
+cxxopts::ParseResult parse_commandline(cxxopts::Options& options, int argc,
+                                       char* argv[]) {
+  try {
+    cxxopts::ParseResult result = options.parse(argc, argv);
+
+    if (result.count("help")) {
+      std::cout << options.help() << std::endl;
+      exit(EXIT_SUCCESS);
+    }
+
+    if (!result.count("name")) {
+      throw cxxopts::exceptions::missing_argument("name");
+    }
+
+    return result;
+  } catch (const cxxopts::exceptions::exception& e) {
+    std::cerr << options.help() << std::endl;
+    exit(EXIT_FAILURE);
+  }
+}
+
+void run(pmt::PMT& sensor, const std::vector<std::string>& command) {
   const char* filename = std::getenv(pmt::kDumpFilenameVariable.c_str());
   sensor.StartDump(filename);
 
-  if (argc == 1) {
+  if (command.empty()) {
     auto first = sensor.Read();
     while (true) {
       auto state = sensor.Read();
@@ -27,16 +65,17 @@ void run(pmt::PMT& sensor, int argc, char* argv[]) {
           std::chrono::milliseconds(sensor.GetMeasurementInterval()));
     }
   } else {
-    std::stringstream command;
-    for (int i = 1; i < argc; i++) {
+    std::stringstream command_stream;
+    for (int i = 1; i < command.size(); i++) {
       if (i > 1) {
-        command << " ";
+        command_stream << " ";
       }
-      command << argv[i];
+      command_stream << command[i];
     }
+    const std::string command_string = command_stream.str();
     auto start = sensor.Read();
-    if (system(command.str().c_str()) != 0) {
-      perror(command.str().c_str());
+    if (system(command_string.c_str()) != 0) {
+      perror(command_string.c_str());
     }
     auto end = sensor.Read();
     std::cout << "Runtime: " << pmt::PMT::seconds(start, end) << " s"
@@ -48,18 +87,17 @@ void run(pmt::PMT& sensor, int argc, char* argv[]) {
 }
 
 int main(int argc, char* argv[]) {
+  cxxopts::Options options = create_commandline_parser(argv);
+  const cxxopts::ParseResult result = parse_commandline(options, argc, argv);
+  const std::string pmt_name = result["name"].as<std::string>();
+  const std::string pmt_device = result["device"].as<std::string>();
+  const std::vector<std::string> command =
+      result["command"].as<std::vector<std::string>>();
+
   try {
-    const std::string pmt_name_env = "PMT_NAME";
-    const std::string pmt_device_env = "PMT_DEVICE";
-    const char* pmt_name = std::getenv(pmt_name_env.c_str());
-    const char* pmt_device = std::getenv(pmt_device_env.c_str());
-    if (pmt_name == nullptr) {
-      throw std::runtime_error(
-          "Select PMT using the PMT_NAME environment variable.");
-    } else {
-      std::unique_ptr<pmt::PMT> sensor = pmt::Create(pmt_name, pmt_device);
-      run(*sensor, argc, argv);
-    }
+    std::unique_ptr<pmt::PMT> sensor =
+        pmt::Create(pmt_name.c_str(), pmt_device.c_str());
+    run(*sensor, command);
     return EXIT_SUCCESS;
   } catch (const std::exception& e) {
     std::cerr << "Error: " << e.what();
