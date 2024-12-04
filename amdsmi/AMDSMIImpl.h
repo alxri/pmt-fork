@@ -24,10 +24,6 @@ class AMDSMIImpl : public AMDSMI {
     return "/tmp/pmt_amdsmi.out";
   }
 
-  virtual int GetMeasurementInterval() override {
-    return 100;  // milliseconds
-  }
-
   amdsmi_processor_handle processor_;
 
   AMDSMIState state_previous_;

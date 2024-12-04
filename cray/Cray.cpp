@@ -54,10 +54,6 @@ class CrayImpl : public Cray {
 
   virtual const char* GetDumpFilename() override { return "/tmp/pmt_cray.out"; }
 
-  virtual int GetMeasurementInterval() override {
-    return 100;  // milliseconds
-  }
-
   unsigned int device_number_;
 
   std::vector<CrayMeasurement> GetMeasurements();

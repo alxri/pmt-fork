@@ -10,8 +10,6 @@ class DummyImpl : public Dummy {
   virtual State GetState() override;
 
   virtual const char *GetDumpFilename() override { return nullptr; }
-
-  virtual int GetMeasurementInterval() override { return 0; }
 };
 
 std::unique_ptr<Dummy> Dummy::Create() { return std::make_unique<DummyImpl>(); }

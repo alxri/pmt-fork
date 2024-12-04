@@ -80,10 +80,6 @@ class PowerSensor3Impl : public PowerSensor3 {
     return "/tmp/pmt_powersensor3.out";
   }
 
-  virtual int GetMeasurementInterval() override {
-    return 1;  // milliseconds
-  }
-
   std::string pairNames[MAX_PAIRS];
   std::unique_ptr<PowerSensor> powersensor_{};
   PowerSensorState first_state_{};

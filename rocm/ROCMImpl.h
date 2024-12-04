@@ -21,10 +21,6 @@ class ROCMImpl : public ROCM {
 
   virtual const char *GetDumpFilename() override { return "/tmp/pmt_rocm.out"; }
 
-  virtual int GetMeasurementInterval() override {
-    return 100;  // milliseconds
-  }
-
   unsigned int device_number_;
 
   ROCMState state_previous_;

@@ -34,10 +34,6 @@ class NVMLImpl : public NVML {
 
   virtual const char *GetDumpFilename() override { return "/tmp/pmt_nvml.out"; }
 
-  virtual int GetMeasurementInterval() override {
-    return 10;  // milliseconds
-  }
-
   NVMLState state_previous_;
   NVMLState GetNVMLState();
   std::vector<NVMLMeasurement> GetMeasurements();

@@ -29,9 +29,6 @@ class TegraImpl : public Tegra {
   virtual const char *GetDumpFilename() override {
     return "/tmp/pmt_tegra.out";
   }
-  virtual int GetMeasurementInterval() override {
-    return measurement_interval_;
-  }
 
  private:
   TegraState GetTegraState();

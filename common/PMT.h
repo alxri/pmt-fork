@@ -60,8 +60,11 @@ class PMT {
   virtual void Mark(const State &start, const State &current,
                     const std::string &message) const;
 
-  virtual int GetMeasurementInterval() = 0;  // in milliseconds
-  virtual float GetDumpInterval();           // in seconds
+  void SetMeasurementInterval(unsigned int milliseconds = 0);
+  unsigned int GetMeasurementInterval() const {
+    return measurement_interval_;
+  };                               // in milliseconds
+  unsigned int GetDumpInterval();  // in milliseconds
 
   State Read();
 
@@ -75,6 +78,8 @@ class PMT {
   static double GetTime();
 
  private:
+  unsigned int measurement_interval_ = 100;  // milliseconds
+
   // The last state returned by Read()
   State state_previous_;
 

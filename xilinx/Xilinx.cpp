@@ -45,10 +45,6 @@ class XilinxImpl : public Xilinx {
     return "/tmp/pmt_xilinx.out";
   }
 
-  virtual int GetMeasurementInterval() override {
-    return 100;  // milliseconds
-  }
-
   std::string filename_;
 
   XilinxState previous_state_;

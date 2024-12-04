@@ -20,10 +20,6 @@ class LikwidImpl : public Likwid {
     return "/tmp/pmt_likwid.out";
   }
 
-  virtual int GetMeasurementInterval() override {
-    return 100;  // milliseconds
-  }
-
  private:
   std::string event_group;
   std::vector<double> GetMeasurements();

@@ -1,5 +1,6 @@
 #include <cassert>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <iomanip>
@@ -7,6 +8,12 @@
 #include <pmt.h>
 
 #include "common/PMT.h"
+namespace {
+template <typename T>
+bool isEqual(T x, T y) {
+  return std::fabs(x - y) <= std::numeric_limits<T>::epsilon();
+}
+}  // end namespace
 namespace pmt {
 
 PMT::~PMT() {
@@ -26,10 +33,15 @@ double PMT::watts(const State &first, const State &second) {
   return joules(first, second) / seconds(first, second);
 }
 
-float PMT::GetDumpInterval() {
+unsigned int PMT::GetDumpInterval() {
   const char *dump_interval_ = std::getenv(kDumpIntervalVariable.c_str());
-  return dump_interval_ ? std::stoi(dump_interval_)
-                        : static_cast<float>(GetMeasurementInterval()) * 1e-3;
+  if (dump_interval_) {
+    unsigned int dump_interval = std::stoi(dump_interval_);
+    assert(dump_interval > 0);
+    return dump_interval;
+  } else {
+    return GetMeasurementInterval();
+  }
 }
 
 std::string State::name(int i) {
@@ -48,6 +60,8 @@ float State::watts(int i) {
 }
 
 void PMT::StartThread() {
+  SetMeasurementInterval();
+
   thread_ = std::thread([&] {
     const State state_start = GetState();
     assert(state_start.nr_measurements_ > 0);
@@ -58,19 +72,13 @@ void PMT::StartThread() {
       DumpHeader(state_start);
     }
 
-    const int measurement_interval =
-        GetMeasurementInterval();  // in milliseconds
-    assert(measurement_interval > 0);
-    const float dumpInterval = GetDumpInterval();  // in seconds
-    assert(dumpInterval > 0);
-
     while (!thread_stop_) {
       std::this_thread::sleep_for(
-          std::chrono::milliseconds(measurement_interval));
+          std::chrono::milliseconds(GetMeasurementInterval()));
       state_latest_ = GetState();
 
-      const float duration = seconds(state_previous, state_latest_);
-      if (dump_file_ && duration > dumpInterval) {
+      if (dump_file_ &&
+          (1e3 * seconds(state_previous, state_latest_)) > GetDumpInterval()) {
         Dump(state_start, state_latest_);
         state_previous = state_latest_;
       }
@@ -129,6 +137,30 @@ void PMT::Mark(const State &start, const State &current,
     std::unique_lock<std::mutex> lock(dump_file_mutex_);
     *dump_file_ << "M " << seconds(start, current) << " \"" << message << "\""
                 << std::endl;
+  }
+}
+
+void PMT::SetMeasurementInterval(unsigned int milliseconds) {
+  if (milliseconds > 0) {
+    measurement_interval_ = milliseconds;
+  } else {
+    unsigned int measurement_interval = 1;
+    State state_first;
+    State state_second;
+    do {
+      state_first = GetState();
+      std::this_thread::sleep_for(
+          std::chrono::milliseconds(measurement_interval));
+      state_second = GetState();
+      if (!isEqual(state_first.watt_[0], state_second.watt_[0])) {
+        break;
+      } else {
+        measurement_interval *= 2;
+      }
+    } while (measurement_interval < 100);
+    measurement_interval_ = measurement_interval < 10
+                                ? measurement_interval
+                                : round(measurement_interval / 10) * 10;
   }
 }
 

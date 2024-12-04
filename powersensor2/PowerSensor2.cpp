@@ -47,10 +47,6 @@ class PowerSensor2Impl : public PowerSensor2 {
     return "/tmp/pmt_powersensor2.out";
   }
 
-  virtual int GetMeasurementInterval() override {
-    return 1;  // milliseconds
-  }
-
   std::unique_ptr<PowerSensor> powersensor_{};
   PowerSensorState first_state_{};
 };
