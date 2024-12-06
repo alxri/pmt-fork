@@ -33,7 +33,7 @@ class PowerSensor3Impl : public PowerSensor3 {
   PowerSensor3Impl(const char *device)
       : powersensor_(std::make_unique<PowerSensor>(device)),
         first_state_(powersensor_->read()) {
-    for (unsigned pair_id; pair_id < MAX_PAIRS; pair_id++) {
+    for (unsigned pair_id = 0; pair_id < MAX_PAIRS; pair_id++) {
       pairNames[pair_id] = GetPairName(pair_id);
     }
   }
@@ -47,7 +47,7 @@ class PowerSensor3Impl : public PowerSensor3 {
     state.joules_[0] = ::Joules(first_state_, powersensor_state, -1);
     state.watt_[0] = ::Watt(first_state_, powersensor_state, -1);
 
-    for (unsigned pair_id; pair_id < MAX_PAIRS; pair_id++) {
+    for (unsigned pair_id = 0; pair_id < MAX_PAIRS; pair_id++) {
       state.name_[pair_id + 1] = pairNames[pair_id];
       state.joules_[pair_id + 1] =
           ::Joules(first_state_, powersensor_state, pair_id);
