@@ -17,7 +17,6 @@ set(POWERSENSOR3_SOURCE "${POWERSENSOR3_ROOT_SRC_DIR}/PowerSensor.cc"
 
 include(AddSensor)
 
-set(LINK_LIBRARIES OpenMP::OpenMP_C)
 set(INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR} ${POWERSENSOR3_ROOT_INC_DIR})
 
 add_sensor(
@@ -27,8 +26,7 @@ add_sensor(
   PowerSensor3.h
   SRC_FILES
   PowerSensor3.cpp
+  PowerSensor3Impl.cpp
   ${POWERSENSOR3_SOURCE}
-  LINK_LIBRARIES
-  ${LINK_LIBRARIES}
   INCLUDE_DIRECTORIES
   ${INCLUDE_DIRECTORIES})

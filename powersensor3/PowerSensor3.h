@@ -14,9 +14,6 @@ class PowerSensor3 : public PMT {
   static std::unique_ptr<PowerSensor3> Create(
       const char *device = default_device().c_str());
   static std::string default_device() { return "/dev/ttyACM0"; }
-  virtual std::string GetPairName(int pairID) { return ""; };
-  virtual bool IsInUse(int pairID) { return false; };
-  virtual State Read(int pairID) { return PMT::Read(); };
 };
 
 }  // end namespace pmt::powersensor3
