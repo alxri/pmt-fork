@@ -91,9 +91,11 @@ int main(int argc, char* argv[]) {
   const cxxopts::ParseResult result = parse_commandline(options, argc, argv);
   const std::string pmt_name = result["name"].as<std::string>();
   const std::string pmt_device = result["device"].as<std::string>();
-  const std::vector<std::string> command =
+  std::vector<std::string> command =
       result["command"].as<std::vector<std::string>>();
-
+  if (command.size() == 1 && command[0].empty()) {
+    command.resize(0);
+  }
   try {
     std::unique_ptr<pmt::PMT> sensor =
         pmt::Create(pmt_name.c_str(), pmt_device.c_str());
