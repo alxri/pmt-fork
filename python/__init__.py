@@ -19,6 +19,8 @@ def watts(start, end):
 
 
 def measure(platform, device_id=None):
+    device_id = str(device_id) if device_id else ""
+
     def decorator(func):
         def wrapper(*args, **kwargs):
             pm = pmt.create(platform, device_id)

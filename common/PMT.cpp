@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -12,6 +13,11 @@ namespace {
 template <typename T>
 bool isEqual(T x, T y) {
   return std::fabs(x - y) <= std::numeric_limits<T>::epsilon();
+}
+
+bool isNumber(const std::string &s) {
+  return !s.empty() && std::all_of(s.begin(), s.end(),
+                                   [](char c) { return std::isdigit(c); });
 }
 }  // end namespace
 namespace pmt {
@@ -187,44 +193,9 @@ State PMT::Read() {
   return state_latest_;
 }
 
-inline void create_warning(const std::string &name) {
-#if defined(DEBUG)
-  std::stringstream error;
-  error << "Invalid or unavailable platform specified: " << name << std::endl;
-  throw std::runtime_error(error.str());
-#endif
-}
-
-std::unique_ptr<PMT> Create(const std::string &name, int argument) {
-#if defined(PMT_BUILD_NVML)
-  if (name == nvml::NVML::name) {
-    return nvml::NVML::Create(argument);
-  }
-#endif
-#if defined(PMT_BUILD_NVIDIA)
-  if (name == nvidia::NVIDIA::name) {
-    return nvidia::NVIDIA::Create(argument);
-  }
-#endif
-#if defined(PMT_BUILD_AMDSMI)
-  if (name == amdsmi::AMDSMI::name) {
-    return amdsmi::AMDSMI::Create(argument);
-  }
-#endif
-#if defined(PMT_BUILD_ROCM)
-  if (name == rocm::ROCM::name) {
-    return rocm::ROCM::Create(argument);
-  }
-#endif
-
-  create_warning(name);
-  return Dummy::Create();
-}
-
-std::unique_ptr<PMT> Create(const std::string &name, const char *argument) {
-  int device_number = 0;
-
-  if (argument == nullptr) {
+std::unique_ptr<PMT> Create(const std::string &name,
+                            const std::string &argument) {
+  if (argument.empty()) {
     // Create PMT instance without argument
 #if defined(PMT_BUILD_CRAY)
     if (name == cray::Cray::name) {
@@ -257,35 +228,58 @@ std::unique_ptr<PMT> Create(const std::string &name, const char *argument) {
     }
 #endif
 
+  } else if (isNumber(argument)) {
+    // Create PMT instance with device number
+    const int device_number = std::stoi(argument);
+
+#if defined(PMT_BUILD_NVML)
+    if (name == nvml::NVML::name) {
+      return nvml::NVML::Create(device_number);
+    }
+#endif
+#if defined(PMT_BUILD_NVIDIA)
+    if (name == nvidia::NVIDIA::name) {
+      return nvidia::NVIDIA::Create(device_number);
+    }
+#endif
+#if defined(PMT_BUILD_AMDSMI)
+    if (name == amdsmi::AMDSMI::name) {
+      return amdsmi::AMDSMI::Create(device_number);
+    }
+#endif
+#if defined(PMT_BUILD_ROCM)
+    if (name == rocm::ROCM::name) {
+      return rocm::ROCM::Create(device_number);
+    }
+#endif
   } else {
-    if (std::strlen(argument) > 1) {
-      // Create PMT instance with const char* argument
+    // Create PMT instance with string argument
+
+    if (argument.size() > 1) {
 #if defined(PMT_BUILD_POWERSENSOR2)
       if (name == powersensor2::PowerSensor2::name) {
-        return powersensor2::PowerSensor2::Create(argument);
+        return powersensor2::PowerSensor2::Create(argument.c_str());
       }
 #endif
 #if defined(PMT_BUILD_POWERSENSOR3)
       if (name == powersensor3::PowerSensor3::name) {
-        return powersensor3::PowerSensor3::Create(argument);
+        return powersensor3::PowerSensor3::Create(argument.c_str());
       }
 #endif
 #if defined(PMT_BUILD_XILINX)
       if (name == xilinx::Xilinx::name) {
-        return xilinx::Xilinx::Create(argument);
+        return xilinx::Xilinx::Create(argument.c_str());
       }
 #endif
-    } else {
-      // Overwrite the default device number
-      device_number = std::atoi(argument);
     }
   }
 
-  // Create PMT instance with integer argument
-  return Create(name, device_number);
+#if defined(DEBUG)
+  std::stringstream error;
+  error << "Invalid or unavailable platform specified: " << name << std::endl;
+  throw std::runtime_error(error.str());
+#endif
 
-  create_warning(name);
   return Dummy::Create();
 }
-
 }  // end namespace pmt

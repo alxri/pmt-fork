@@ -7,11 +7,16 @@ namespace py = pybind11;
 PYBIND11_MODULE(pmt, m) {
   m.doc() = "libpmt python bindings";
 
-  m.def("create", py::overload_cast<const std::string &, int>(&pmt::Create),
-        py::arg("name"), py::arg("argument"));
-  m.def("create",
-        py::overload_cast<const std::string &, const char *>(&pmt::Create),
-        py::arg("name"), py::arg("argument"));
+  m.def(
+      "create", [](py::str name) { return pmt::Create(name, ""); },
+      "Create PMT instance");
+
+  m.def(
+      "create",
+      [](py::str name, py::object argument) {
+        return pmt::Create(name, py::str(argument));
+      },
+      "Create PMT instance");
 
   py::class_<pmt::PMT>(m, "PMT")
       .def("seconds", &pmt::PMT::seconds, "Get elapsed time")
