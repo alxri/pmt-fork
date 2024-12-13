@@ -15,7 +15,7 @@ cxxopts::Options create_commandline_parser(char* argv[]) {
   options.add_options()("n,name", "Name (required)",
                         cxxopts::value<std::string>())(
       "d,device", "Device (optional)",
-      cxxopts::value<std::string>()->default_value("default_device"))(
+      cxxopts::value<std::string>()->default_value(""))(
       "command", "Command (optional)",
       cxxopts::value<std::vector<std::string>>()->default_value({}))(
       "h,help", "Print usage");
@@ -50,19 +50,18 @@ void run(pmt::PMT& sensor, const std::vector<std::string>& command) {
   sensor.StartDump(filename);
 
   if (command.empty()) {
-    auto first = sensor.Read();
     while (true) {
       auto state = sensor.Read();
-      std::cout << pmt::PMT::seconds(first, state) << " s, ";
+      std::cout << std::fixed << state.timestamp() << ", ";
       for (int i = 0; i < state.NrMeasurements(); i++) {
         std::cout << state.name(i) << ": " << state.watts(i) << " W";
         if (i < (state.NrMeasurements() - 1)) {
           std::cout << ", ";
         }
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(sensor.GetMeasurementInterval()));
       }
       std::cout << std::endl;
-      std::this_thread::sleep_for(
-          std::chrono::milliseconds(sensor.GetMeasurementInterval()));
     }
   } else {
     std::stringstream command_stream;
