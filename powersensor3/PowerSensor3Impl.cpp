@@ -4,10 +4,7 @@ namespace pmt::powersensor3 {
 
 PowerSensor3State::operator State() {
   State state(::PowerSensor3::MAX_PAIRS);
-  state.timestamp_ = std::chrono::duration_cast<std::chrono::microseconds>(
-                         state_.timeAtRead.time_since_epoch())
-                         .count() /
-                     1.e6;
+  state.timestamp_ = state_.timeAtRead;
 
   for (size_t i = 0; i < state.nr_measurements_; i++) {
     state.name_[i] = pair_names_[i];

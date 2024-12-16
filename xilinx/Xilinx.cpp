@@ -29,7 +29,7 @@ namespace pmt::xilinx {
 class XilinxState {
  public:
   operator State();
-  double timestamp_;
+  Timestamp timestamp_;
   double watt_ = 0;
   double joules_ = 0;
 };
@@ -78,7 +78,7 @@ XilinxState XilinxImpl::GetXilinxState() {
   state.watt_ = anonymous::GetPower(filename_) * 1e-6;
   state.joules_ = previous_state_.joules_;
   const float watts = (state.watt_ + previous_state_.watt_) / 2;
-  const float duration = (state.timestamp_ - previous_state_.timestamp_);
+  const double duration = seconds(previous_state_.timestamp_, state.timestamp_);
   state.joules_ += watts * duration;
   previous_state_ = state;
   return state;

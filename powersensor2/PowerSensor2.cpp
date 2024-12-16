@@ -35,7 +35,9 @@ class PowerSensor2Impl : public PowerSensor2 {
   State GetState() override {
     const PowerSensorState powersensor_state = powersensor_->read();
     State state;
-    state.timestamp_ = ::Seconds(first_state_, powersensor_state);
+    state.timestamp_ =
+        Timestamp(std::chrono::microseconds(static_cast<long long>(
+            ::Seconds(first_state_, powersensor_state) * 1e9)));
     state.name_[0] = "device";
     state.joules_[0] = ::Joules(first_state_, powersensor_state, -1);
     state.watt_[0] = ::Watt(first_state_, powersensor_state, -1);

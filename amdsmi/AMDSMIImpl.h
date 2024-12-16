@@ -7,7 +7,7 @@ namespace pmt::amdsmi {
 class AMDSMIState {
  public:
   operator State();
-  double timestamp_;
+  Timestamp timestamp_;
   double watt_ = 0;
   double joules_ = 0;
 };

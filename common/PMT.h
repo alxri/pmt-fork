@@ -1,6 +1,7 @@
 #ifndef PMT_COMMON_H_
 #define PMT_COMMON_H_
 
+#include <chrono>
 #include <fstream>
 #include <memory>
 #include <mutex>
@@ -12,6 +13,8 @@ namespace pmt {
 
 const std::string kDumpFilenameVariable = "PMT_DUMP_FILE";
 const std::string kDumpIntervalVariable = "PMT_DUMP_INTERVAL";
+
+using Timestamp = std::chrono::high_resolution_clock::time_point;
 
 class State {
  public:
@@ -32,12 +35,12 @@ class State {
 
   int NrMeasurements() { return nr_measurements_; }
 
-  double timestamp() { return timestamp_; }
+  Timestamp timestamp() { return timestamp_; }
   std::string name(int i);
   float joules(int i);
   float watts(int i);
 
-  double timestamp_;
+  Timestamp timestamp_;
   int nr_measurements_;
   std::vector<std::string> name_;
   std::vector<float> joules_;
@@ -47,6 +50,10 @@ class State {
 class PMT {
  public:
   virtual ~PMT();
+
+  static double seconds(const Timestamp &timestamp);
+
+  static double seconds(const Timestamp &first, const Timestamp &second);
 
   static double seconds(const State &first, const State &second);
 
@@ -73,9 +80,9 @@ class PMT {
 
   virtual const char *GetDumpFilename() = 0;
 
-  void Dump(const State &start, const State &second);
+  void Dump(const State &state);
 
-  static double GetTime();
+  Timestamp GetTime();
 
  private:
   unsigned int measurement_interval_ = 100;  // milliseconds
@@ -106,5 +113,7 @@ std::unique_ptr<PMT> Create(const std::string &name,
                             const std::string &argument = "");
 
 }  // end namespace pmt
+
+std::ostream &operator<<(std::ostream &os, const pmt::Timestamp &timestamp);
 
 #endif

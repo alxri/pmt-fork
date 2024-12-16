@@ -82,7 +82,8 @@ std::vector<NVMLMeasurement> NVMLImpl::GetMeasurements() {
       int idx = nr_field_ids * i + j;
       measurements[idx].name = scopeNames[i] + suffixes[j];
       measurements[idx].value = values[idx].value.uiVal;
-      measurements[idx].timestamp = values[idx].timestamp;
+      measurements[idx].timestamp =
+          Timestamp(std::chrono::microseconds(values[idx].timestamp));
     }
   }
 
@@ -97,7 +98,6 @@ NVMLState NVMLImpl::GetNVMLState() {
 
   NVMLState state;
   try {
-    state.timestamp_ = GetTime();
     state.measurements_ = GetMeasurements();
 
     // Default: use use the instantaneous GPU power
@@ -108,13 +108,14 @@ NVMLState NVMLImpl::GetNVMLState() {
 #else
     const unsigned int measurement_id = nr_scopes_ == 1 ? 0 : 2;
     state.watt_ = state.measurements_[measurement_id].value;
-    state.timestamp_ = state.measurements_[measurement_id].timestamp / 1.0e6;
+    state.timestamp_ = state.measurements_[measurement_id].timestamp;
 #endif
 
     // Set derived fields of state
     state.joules_ = state_previous_.joules_;
     const float watt = (state.watt_ + state_previous_.watt_) / 2;
-    const float duration = (state.timestamp_ - state_previous_.timestamp_);
+    const double duration =
+        seconds(state_previous_.timestamp_, state.timestamp_);
     state.joules_ += watt * duration;
     state.watt_ = watt;
 

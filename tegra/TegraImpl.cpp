@@ -255,7 +255,7 @@ TegraState TegraImpl::GetTegraState() {
   }
 
   const float watt = (state.watt_ + previous_state_.watt_) / 2;
-  const float duration = (state.timestamp_ - previous_state_.timestamp_);
+  const double duration = seconds(previous_state_.timestamp_, state.timestamp_);
   state.joules_ = previous_state_.joules_ + (watt * duration);
 
   previous_state_ = state;

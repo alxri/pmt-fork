@@ -34,7 +34,7 @@ class RaplImpl : public Rapl {
 
   std::vector<RaplMeasurement> GetMeasurements();
 
-  double previous_timestamp_;
+  Timestamp previous_timestamp_;
   std::vector<RaplMeasurement> previous_measurements_;
 
   std::vector<std::string> packages_names_;

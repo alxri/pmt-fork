@@ -12,13 +12,13 @@ namespace pmt::nvml {
 struct NVMLMeasurement {
   std::string name;
   unsigned int value;
-  unsigned int timestamp;
+  Timestamp timestamp;
 };
 
 class NVMLState {
  public:
   operator State();
-  double timestamp_;
+  Timestamp timestamp_;
   std::vector<NVMLMeasurement> measurements_;
   unsigned int watt_ = 0;
   unsigned int joules_ = 0;

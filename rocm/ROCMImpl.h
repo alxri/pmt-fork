@@ -6,7 +6,7 @@ namespace pmt::rocm {
 class ROCMState {
  public:
   operator State();
-  double timestamp_;
+  Timestamp timestamp_;
   double watt_ = 0;
   double joules_ = 0;
 };

@@ -13,7 +13,7 @@ using TegraMeasurement = std::pair<std::string, int>;
 class TegraState {
  public:
   operator State();
-  double timestamp_;
+  Timestamp timestamp_;
   std::vector<TegraMeasurement> measurements;
   unsigned int watt_ = 0;
   unsigned int joules_ = 0;

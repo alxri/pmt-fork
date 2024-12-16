@@ -120,7 +120,7 @@ State LikwidImpl::GetState() {
   State state(nr_groups + 1);
   state.timestamp_ = GetTime();
 
-  double duration = state.timestamp_ - previous_time;
+  const double duration = seconds(state.timestamp_, state.timestamp_);
   double total_watts = 0;
   std::vector<double> current_measurements = GetMeasurements();
   for (int i = 0; i < nr_groups; i++) {

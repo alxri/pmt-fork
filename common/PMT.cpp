@@ -20,6 +20,7 @@ bool isNumber(const std::string &s) {
                                    [](char c) { return std::isdigit(c); });
 }
 }  // end namespace
+
 namespace pmt {
 
 PMT::~PMT() {
@@ -27,8 +28,21 @@ PMT::~PMT() {
   StopThread();
 };
 
+double PMT::seconds(const Timestamp &timestamp) {
+  return std::chrono::duration_cast<std::chrono::microseconds>(
+             timestamp.time_since_epoch())
+             .count() /
+         1.e6;
+}
+
+double PMT::seconds(const Timestamp &first, const Timestamp &second) {
+  return std::chrono::duration_cast<std::chrono::microseconds>((second - first))
+             .count() /
+         1.e6;
+}
+
 double PMT::seconds(const State &first, const State &second) {
-  return second.timestamp_ - first.timestamp_;
+  return seconds(first.timestamp_, second.timestamp_);
 }
 
 double PMT::joules(const State &first, const State &second) {
@@ -69,13 +83,12 @@ void PMT::StartThread() {
   SetMeasurementInterval();
 
   thread_ = std::thread([&] {
-    const State state_start = GetState();
-    assert(state_start.nr_measurements_ > 0);
-    State state_previous = state_start;
-    state_latest_ = state_start;
+    State state_previous = GetState();
+    assert(state_previous.nr_measurements_ > 0);
+    state_latest_ = state_previous;
 
     if (dump_file_) {
-      DumpHeader(state_start);
+      DumpHeader(state_previous);
     }
 
     while (!thread_stop_) {
@@ -85,7 +98,7 @@ void PMT::StartThread() {
 
       if (dump_file_ &&
           (1e3 * seconds(state_previous, state_latest_)) > GetDumpInterval()) {
-        Dump(state_start, state_latest_);
+        Dump(state_latest_);
         state_previous = state_latest_;
       }
     }
@@ -126,11 +139,12 @@ void PMT::DumpHeader(const State &state) {
   }
 }
 
-void PMT::Dump(const State &start, const State &second) {
+void PMT::Dump(const State &state) {
   if (dump_file_ != nullptr) {
     std::unique_lock<std::mutex> lock(dump_file_mutex_);
-    *dump_file_ << std::fixed << std::setprecision(3) << seconds(start, second);
-    for (float watt : second.watt_) {
+    *dump_file_ << std::fixed << std::setprecision(3)
+                << seconds(state.timestamp_);
+    for (float watt : state.watt_) {
       *dump_file_ << " " << watt;
     }
     *dump_file_ << std::endl;
@@ -170,12 +184,7 @@ void PMT::SetMeasurementInterval(unsigned int milliseconds) {
   }
 }
 
-double PMT::GetTime() {
-  return std::chrono::duration_cast<std::chrono::microseconds>(
-             std::chrono::system_clock::now().time_since_epoch())
-             .count() /
-         1.0e6;
-}
+Timestamp PMT::GetTime() { return std::chrono::system_clock::now(); }
 
 State PMT::Read() {
   const int measurement_interval = GetMeasurementInterval();
@@ -283,3 +292,8 @@ std::unique_ptr<PMT> Create(const std::string &name,
   return Dummy::Create();
 }
 }  // end namespace pmt
+
+std::ostream &operator<<(std::ostream &os, const pmt::Timestamp &timestamp) {
+  os << pmt::PMT::seconds(timestamp);
+  return os;
+}

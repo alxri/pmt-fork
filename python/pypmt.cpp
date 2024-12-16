@@ -19,7 +19,10 @@ PYBIND11_MODULE(pmt, m) {
       "Create PMT instance");
 
   py::class_<pmt::PMT>(m, "PMT")
-      .def("seconds", &pmt::PMT::seconds, "Get elapsed time")
+      .def("seconds",
+           py::overload_cast<const pmt::State&, const pmt::State&>(
+               &pmt::PMT::seconds),
+           "Get elapsed time")
       .def("joules", &pmt::PMT::joules, "Get energy consumption")
       .def("watts", &pmt::PMT::watts, "Get average power consumption")
       .def("read", &pmt::PMT::Read)

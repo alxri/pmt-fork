@@ -46,7 +46,7 @@ class CrayImpl : public Cray {
   std::vector<std::string> filenames;
   std::string cray_pm_counters_path = "/sys/cray/pm_counters";
 
-  double previous_timestamp_;
+  Timestamp previous_timestamp_;
   std::vector<CrayMeasurement> previous_measurements_;
 
   // Mutex used to guard GetMeasurements()
@@ -95,7 +95,7 @@ State CrayImpl::GetState() {
   State state(measurements.size());
   state.timestamp_ = GetTime();
 
-  const double duration = (state.timestamp_ - previous_timestamp_);
+  const double duration = seconds(previous_timestamp_, state.timestamp_);
 
   for (size_t i = 0; i < measurements.size(); i++) {
     state.name_[i] = measurements[i].name;

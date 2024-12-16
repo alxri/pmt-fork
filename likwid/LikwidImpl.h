@@ -24,7 +24,7 @@ class LikwidImpl : public Likwid {
   std::string event_group;
   std::vector<double> GetMeasurements();
 
-  double previous_time;
+  Timestamp previous_time;
   int nr_groups, nr_events;
   int nr_threads_group;
   std::vector<int> relevant_event_ids;

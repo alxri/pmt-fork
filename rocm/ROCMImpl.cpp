@@ -78,7 +78,7 @@ ROCMState ROCMImpl::GetROCMState() {
   state.watt_ = GetPower(device_number_);
   state.joules_ = state_previous_.joules_;
   const float watt = (state.watt_ + state_previous_.watt_) / 2;
-  const float duration = (state.timestamp_ - state_previous_.timestamp_);
+  const double duration = seconds(state_previous_.timestamp_, state.timestamp_);
   state.joules_ += watt * duration;
   state_previous_ = state;
   return state;
