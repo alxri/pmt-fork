@@ -194,11 +194,6 @@ State PMT::Read() {
     std::this_thread::sleep_for(
         std::chrono::milliseconds(measurement_interval));
   }
-  while (seconds(state_previous_, state_latest_) == 0) {
-    std::this_thread::sleep_for(
-        std::chrono::milliseconds(measurement_interval));
-  }
-  state_previous_ = state_latest_;
   return state_latest_;
 }
 

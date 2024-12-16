@@ -76,7 +76,7 @@ class PMT {
   State Read();
 
  protected:
-  virtual State GetState() { return state_previous_; };
+  virtual State GetState() { return state_latest_; };
 
   virtual const char *GetDumpFilename() = 0;
 
@@ -86,9 +86,6 @@ class PMT {
 
  private:
   unsigned int measurement_interval_ = 100;  // milliseconds
-
-  // The last state returned by Read()
-  State state_previous_;
 
   // The last state set by the thread
   State state_latest_;
