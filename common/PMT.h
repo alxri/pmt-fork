@@ -64,8 +64,7 @@ class PMT {
   void StartDump(const char *filename = nullptr);
   void StopDump();
 
-  virtual void Mark(const State &start, const State &current,
-                    const std::string &message) const;
+  virtual void Mark(const State &state, const std::string &message) const;
 
   void SetMeasurementInterval(unsigned int milliseconds = 0);
   unsigned int GetMeasurementInterval() const {

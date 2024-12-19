@@ -151,12 +151,11 @@ void PMT::Dump(const State &state) {
   }
 }
 
-void PMT::Mark(const State &start, const State &current,
-               const std::string &message) const {
+void PMT::Mark(const State &state, const std::string &message) const {
   if (dump_file_ != nullptr) {
     std::unique_lock<std::mutex> lock(dump_file_mutex_);
-    *dump_file_ << "M " << seconds(start, current) << " \"" << message << "\""
-                << std::endl;
+    *dump_file_ << "M " << std::fixed << seconds(state.timestamp_) << " \""
+                << message << "\"" << std::endl;
   }
 }
 
