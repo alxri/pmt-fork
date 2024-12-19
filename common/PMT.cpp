@@ -231,7 +231,16 @@ std::unique_ptr<PMT> Create(const std::string &name,
       return nvidia::NVIDIA::Create();
     }
 #endif
-
+#if defined(PMT_BUILD_AMDSMI)
+    if (name == amdsmi::AMDSMI::name) {
+      return amdsmi::AMDSMI::Create();
+    }
+#endif
+#if defined(PMT_BUILD_ROCM)
+    if (name == rocm::ROCM::name) {
+      return rocm::ROCM::Create();
+    }
+#endif
   } else if (isNumber(argument)) {
     // Create PMT instance with device number
     const int device_number = std::stoi(argument);
