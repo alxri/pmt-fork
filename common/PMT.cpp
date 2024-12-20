@@ -172,14 +172,12 @@ void PMT::SetMeasurementInterval(unsigned int milliseconds) {
           std::chrono::milliseconds(measurement_interval));
       state_second = GetState();
       if (!isEqual(state_first.watt_[0], state_second.watt_[0])) {
-        break;
+        measurement_interval_ = measurement_interval;
+        return;
       } else {
         measurement_interval *= 2;
       }
-    } while (measurement_interval < 100);
-    measurement_interval_ = measurement_interval < 10
-                                ? measurement_interval
-                                : round(measurement_interval / 10) * 10;
+    } while (measurement_interval < 1000);
   }
 }
 

@@ -15,10 +15,10 @@ namespace pmt::nvml {
 NVMLState::operator State() {
   State state(measurements_.size());
   state.timestamp_ = timestamp_;
-  state.joules_[0] = joules_ * 1e-3;
+  state.joules_[0] = joules_;
   for (size_t i = 0; i < measurements_.size(); i++) {
-    state.name_[i] = measurements_[i].name;
-    state.watt_[i] = measurements_[i].value * 1e-3;
+    state.name_[i] = measurements_[i].name_;
+    state.watt_[i] = measurements_[i].milliwatt_ / 1.e3;
   }
   return state;
 }
@@ -43,17 +43,18 @@ NVMLImpl::NVMLImpl(int device_number) {
   device_->getFieldValues(1, values);
   nr_scopes_ = 1 + (values[0].nvmlReturn == NVML_SUCCESS);
 #endif
+
+  // Initialize the first timestamp
+  state_previous_.timestamp_ = GetTime();
 }
 
 NVMLImpl::~NVMLImpl() { stopped_ = true; }
 
 #if defined(PMT_NVML_LEGACY_MODE)
 std::vector<NVMLMeasurement> NVMLImpl::GetMeasurements() {
-  NVMLMeasurement measurement;
-  measurement.name = "gpu_average";
-  measurement.value = device_->getPower();
-  measurement.timestamp = GetTime();
-  return {measurement};
+  return {{.name_ = "gpu_average",
+           .milliwatt_ = device_->getPower(),
+           .timestamp_ = GetTime()}};
 }
 #else
 std::vector<NVMLMeasurement> NVMLImpl::GetMeasurements() {
@@ -80,9 +81,9 @@ std::vector<NVMLMeasurement> NVMLImpl::GetMeasurements() {
   for (int i = 0; i < nr_scopes_; ++i) {
     for (int j = 0; j < nr_field_ids; ++j) {
       int idx = nr_field_ids * i + j;
-      measurements[idx].name = scopeNames[i] + suffixes[j];
-      measurements[idx].value = values[idx].value.uiVal;
-      measurements[idx].timestamp =
+      measurements[idx].name_ = scopeNames[i] + suffixes[j];
+      measurements[idx].milliwatt_ = values[idx].value.uiVal;
+      measurements[idx].timestamp_ =
           Timestamp(std::chrono::microseconds(values[idx].timestamp));
     }
   }
@@ -100,24 +101,29 @@ NVMLState NVMLImpl::GetNVMLState() {
   try {
     state.measurements_ = GetMeasurements();
 
-    // Default: use use the instantaneous GPU power
+    // Default: use the instantaneous GPU power
     // Grace Hopper: use the instantaneous module power
 #if defined(PMT_NVML_LEGACY_MODE)
-    state.watt_ = state.measurements_[0].value;
-    state.timestamp_ = state.measurements_[0].timestamp;
+    state.milliwatt_ = state.measurements_[0].milliwatt_;
+    state.timestamp_ = state.measurements_[0].timestamp_;
 #else
     const unsigned int measurement_id = nr_scopes_ == 1 ? 0 : 2;
-    state.watt_ = state.measurements_[measurement_id].value;
-    state.timestamp_ = state.measurements_[measurement_id].timestamp;
+    state.milliwatt_ = state.measurements_[measurement_id].milliwatt_;
+    state.timestamp_ = state.measurements_[measurement_id].timestamp_;
 #endif
 
     // Set derived fields of state
-    state.joules_ = state_previous_.joules_;
-    const float watt = (state.watt_ + state_previous_.watt_) / 2;
     const double duration =
         seconds(state_previous_.timestamp_, state.timestamp_);
-    state.joules_ += watt * duration;
-    state.watt_ = watt;
+
+    if (state_previous_.joules_ > 0) {
+      const double watt =
+          (state.milliwatt_ + state_previous_.milliwatt_) / 2.e3;
+      state.joules_ = state_previous_.joules_ + watt * duration;
+    } else {
+      const double watt = state.milliwatt_ / 1.e3;
+      state.joules_ = watt * duration;
+    }
 
     state_previous_ = state;
   } catch (std::runtime_error &e) {

@@ -10,9 +10,9 @@ class Device;
 namespace pmt::nvml {
 
 struct NVMLMeasurement {
-  std::string name;
-  unsigned int value;
-  Timestamp timestamp;
+  std::string name_;
+  unsigned int milliwatt_;
+  Timestamp timestamp_;
 };
 
 class NVMLState {
@@ -20,7 +20,7 @@ class NVMLState {
   operator State();
   Timestamp timestamp_;
   std::vector<NVMLMeasurement> measurements_;
-  unsigned int watt_ = 0;
+  unsigned int milliwatt_ = 0;
   unsigned int joules_ = 0;
 };
 
