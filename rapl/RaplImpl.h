@@ -12,7 +12,6 @@
 
 namespace pmt::rapl {
 
-const int kNumRaplDomains = 4;
 const int kKeepAliveInterval = 10;  // call Measure() roughly every nth update
 
 struct RaplMeasurement {

@@ -1,18 +1,22 @@
 #include <cassert>
 #include <cerrno>
 #include <iostream>
+#include <charconv>
+#include <filesystem>
 #include <iterator>
 #include <memory>
 #include <cstring>
+#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <algorithm>
 #include <string>
 #include <utility>
+#include <vector>
 #include <filesystem>
 #include <system_error>
 
-#include <charconv>
+namespace fs = std::filesystem;
 
 #include <sched.h>
 #include <unistd.h>
@@ -80,61 +84,68 @@ Numeric read_numerical_value(int fd) {
 }
 
 void RaplImpl::Init() {
-  try {
-    for (std::size_t i = 0; i < kNumRaplDomains; i++) {
-      try {
-        std::string basename = GetBasename(i);
+  const fs::path basename = "/sys/class/powercap";
+  const std::regex pattern("intel-rapl(:\\d+)+");
 
-        if (!std::filesystem::exists(basename)) {
-          break;
-        }
+  std::vector<std::string> rapl_dirs;
 
-        const os::file_descriptor fd_rapl_dir = os::opendir(basename);
-        const os::file_descriptor name_fd =
-            os::openat(fd_rapl_dir.fd(), "name");
+  for (const auto& entry : fs::directory_iterator(basename)) {
+    const std::string directory = entry.path().filename().string();
 
-        // Read domain name
-        const std::string package_id = read_string(name_fd.fd());
-
-        const os::file_descriptor max_energy_fd =
-            os::openat(fd_rapl_dir.fd(), "max_energy_range_uj");
-        std::size_t max_energy_range_uj =
-            read_numerical_value<std::size_t>(max_energy_fd.fd());
-
-        os::file_descriptor energy_uj_fd =
-            os::openat(fd_rapl_dir.fd(), "energy_uj");
-        std::ignore = read_numerical_value<std::size_t>(energy_uj_fd.fd());
-
-        packages_names_.push_back(package_id);
-        uj_max_.push_back(max_energy_range_uj);
-        energy_fds_.emplace_back(std::move(energy_uj_fd));
-      } catch (std::system_error& e) {
-        std::stringstream message;
-        message << "OS error: " << e.what();
-        std::cerr << message.str() << std::endl;
-        if (e.code().value() == EACCES) {
-          std::cerr << "Please check the permission or try to run as 'root'"
-                    << std::endl;
-        }
+    if (std::regex_match(directory, pattern)) {
+      if (fs::exists(entry.path() / "energy_uj")) {
+        rapl_dirs.push_back(entry.path());
       }
     }
+  }
 
-    // Initialize state variables
-    const std::size_t n = uj_max_.size();
-    uj_first_.resize(n);
-    uj_previous_.resize(n);
-    uj_offset_.resize(n);
-    std::vector<RaplMeasurement> measurements = GetMeasurements();
-    for (std::size_t i = 0; i < n; i++) {
-      uj_first_[i] = measurements[i].joules;
-      uj_previous_[i] = uj_first_[i];
-      uj_offset_[i] = 0;
+  if (rapl_dirs.empty()) {
+    std::cerr
+        << "Warning: no RAPL interface detected. Please make sure that the "
+           "system supports RAPL and that you have the necessary permissions."
+        << std::endl;
+  }
+
+  for (const auto& rapl_dir : rapl_dirs) {
+    try {
+      const os::file_descriptor fd_rapl_dir = os::opendir(rapl_dir);
+      const os::file_descriptor name_fd = os::openat(fd_rapl_dir.fd(), "name");
+
+      const std::string package_id = read_string(name_fd.fd());
+
+      const os::file_descriptor max_energy_fd =
+          os::openat(fd_rapl_dir.fd(), "max_energy_range_uj");
+      std::size_t max_energy_range_uj =
+          read_numerical_value<std::size_t>(max_energy_fd.fd());
+
+      os::file_descriptor energy_uj_fd =
+          os::openat(fd_rapl_dir.fd(), "energy_uj");
+      std::ignore = read_numerical_value<std::size_t>(energy_uj_fd.fd());
+
+      packages_names_.push_back(package_id);
+      uj_max_.push_back(max_energy_range_uj);
+      energy_fds_.emplace_back(std::move(energy_uj_fd));
+    } catch (std::system_error& e) {
+      std::stringstream message;
+      message << "OS error: " << e.what();
+      std::cerr << message.str() << std::endl;
+      if (e.code().value() == EACCES) {
+        std::cerr << "Please check the permissions or try to run as 'root'"
+                  << std::endl;
+      }
     }
+  }
 
-  } catch (std::exception& e) {
-    std::stringstream message;
-    message << "Unable to init rapl plugin: " << e.what();
-    std::cerr << message.str() << std::endl;
+  // Initialize state variables
+  const std::size_t n = uj_max_.size();
+  uj_first_.resize(n);
+  uj_previous_.resize(n);
+  uj_offset_.resize(n);
+  std::vector<RaplMeasurement> measurements = GetMeasurements();
+  for (std::size_t i = 0; i < n; i++) {
+    uj_first_[i] = measurements[i].joules;
+    uj_previous_[i] = uj_first_[i];
+    uj_offset_[i] = 0;
   }
 }
 
