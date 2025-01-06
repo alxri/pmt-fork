@@ -27,12 +27,16 @@ class NVMLState {
 class NVMLImpl : public NVML {
  public:
   NVMLImpl(int device_number);
+#if defined(PMT_NVML_CUDAWRAPPERS_API)
+  NVMLImpl(cu::Device& device);
+#endif
   ~NVMLImpl();
 
  private:
+  void Initialize();
   State GetState() override { return GetNVMLState(); }
 
-  virtual const char *GetDumpFilename() override { return "/tmp/pmt_nvml.out"; }
+  virtual const char* GetDumpFilename() override { return "/tmp/pmt_nvml.out"; }
 
   NVMLState state_previous_;
   NVMLState GetNVMLState();

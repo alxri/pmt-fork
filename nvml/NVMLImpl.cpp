@@ -33,8 +33,19 @@ NVMLImpl::NVMLImpl(int device_number) {
 
   // Initialize NVML
   context_ = std::make_unique<::nvml::Context>();
-  device_ = std::make_unique<::nvml::Device>(*context_, device);
+  device_ = std::make_unique<::nvml::Device>(device);
 
+  Initialize();
+}
+
+#if defined(PMT_NVML_CUDAWRAPPERS_API)
+NVMLImpl::NVMLImpl(cu::Device &device)
+    : device_(std::make_unique<::nvml::Device>(device)) {
+  Initialize();
+}
+#endif
+
+void NVMLImpl::Initialize() {
   // Check whether the CPU+GPU scope is supported (e.g. Grace Hopper)
 #if not defined(PMT_NVML_LEGACY_MODE)
   nvmlFieldValue_t values[1];
