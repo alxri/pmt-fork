@@ -9,6 +9,7 @@ add_sensor(
   Rapl.h
   SRC_FILES
   Rapl.cpp
+  RaplCounter.cpp
   RaplImpl.cpp
   LINK_LIBRARIES
   ${LINK_LIBRARIES})

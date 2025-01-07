@@ -1,27 +1,26 @@
+#include <algorithm>
+#include <array>
 #include <cassert>
 #include <cerrno>
-#include <iostream>
-#include <charconv>
+#include <cstring>
 #include <filesystem>
+#include <iostream>
 #include <iterator>
 #include <memory>
-#include <cstring>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
-#include <algorithm>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <vector>
-#include <filesystem>
-#include <system_error>
 
 namespace fs = std::filesystem;
 
-#include <sched.h>
-#include <unistd.h>
-
 #include "RaplImpl.h"
+#include "RaplCounter.h"
+
+#include "common/cpu.h"
 
 /*
  * RAPL (Running Average Power Limit) is an API provided by Intel for power
@@ -47,54 +46,36 @@ RaplImpl::RaplImpl() {
   previous_measurements_ = GetMeasurements();
 }
 
+RaplImpl::~RaplImpl() { std::lock_guard<std::mutex> lock(mutex_); }
+
 std::string GetBasename(int package_id) {
   std::stringstream basename;
   basename << "/sys/class/powercap/intel-rapl:" << package_id;
   return basename.str();
 }
 
-std::string read_string(int fd) {
-  std::string result;
-  std::array<std::byte, 256> buffer;
-  const std::size_t read_size = os::pread(fd, buffer, 0);
-  result.reserve(read_size);
-  for (std::size_t i = 0; i < read_size; ++i) {
-    const char c = static_cast<char>(buffer[i]);
-    if (!std::isspace(c) && c != '\n') {
-      result.push_back(c);
-    }
-  }
-  return result;
-}
-
-template <typename Numeric>
-Numeric read_numerical_value(int fd) {
-  Numeric value = 0;
-  std::array<std::byte, 256> buffer;
-  const std::size_t read_size = os::pread(fd, buffer, 0);
-  std::from_chars_result res = std::from_chars(
-      static_cast<const char*>(static_cast<void*>(buffer.data())),
-      static_cast<const char*>(static_cast<void*>(buffer.data() + read_size)),
-      value);
-  if (res.ec == std::errc::invalid_argument &&
-      res.ec == std::errc::result_out_of_range) {
-    throw std::runtime_error("Unable to parse file to numerical value");
-  }
-  return value;
-}
-
 void RaplImpl::Init() {
   const fs::path basename = "/sys/class/powercap";
-  const std::regex pattern("intel-rapl(:\\d+)+");
+  const std::regex pattern_directory("intel-rapl(:\\d+)+");
+  const std::regex pattern_package_id(":([0-9]+)");
 
   std::vector<std::string> rapl_dirs;
+
+  const std::set active_sockets =
+      common::get_active_packages(common::get_active_cpus());
 
   for (const auto& entry : fs::directory_iterator(basename)) {
     const std::string directory = entry.path().filename().string();
 
-    if (std::regex_match(directory, pattern)) {
+    std::smatch match;
+    if (std::regex_match(directory, pattern_directory)) {
       if (fs::exists(entry.path() / "energy_uj")) {
-        rapl_dirs.push_back(entry.path());
+        if (std::regex_search(directory, match, pattern_package_id)) {
+          const int package_id = std::stoi(match[1].str());
+          if (active_sockets.find(package_id) != active_sockets.end()) {
+            rapl_dirs.emplace_back(entry.path());
+          }
+        }
       }
     }
   }
@@ -108,23 +89,7 @@ void RaplImpl::Init() {
 
   for (const auto& rapl_dir : rapl_dirs) {
     try {
-      const os::file_descriptor fd_rapl_dir = os::opendir(rapl_dir);
-      const os::file_descriptor name_fd = os::openat(fd_rapl_dir.fd(), "name");
-
-      const std::string package_id = read_string(name_fd.fd());
-
-      const os::file_descriptor max_energy_fd =
-          os::openat(fd_rapl_dir.fd(), "max_energy_range_uj");
-      std::size_t max_energy_range_uj =
-          read_numerical_value<std::size_t>(max_energy_fd.fd());
-
-      os::file_descriptor energy_uj_fd =
-          os::openat(fd_rapl_dir.fd(), "energy_uj");
-      std::ignore = read_numerical_value<std::size_t>(energy_uj_fd.fd());
-
-      packages_names_.push_back(package_id);
-      uj_max_.push_back(max_energy_range_uj);
-      energy_fds_.emplace_back(std::move(energy_uj_fd));
+      rapl_counters_.emplace_back(rapl_dir);
     } catch (std::system_error& e) {
       std::stringstream message;
       message << "OS error: " << e.what();
@@ -135,50 +100,18 @@ void RaplImpl::Init() {
       }
     }
   }
-
-  // Initialize state variables
-  const std::size_t n = uj_max_.size();
-  uj_first_.resize(n);
-  uj_previous_.resize(n);
-  uj_offset_.resize(n);
-  std::vector<RaplMeasurement> measurements = GetMeasurements();
-  for (std::size_t i = 0; i < n; i++) {
-    uj_first_[i] = measurements[i].joules;
-    uj_previous_[i] = uj_first_[i];
-    uj_offset_[i] = 0;
-  }
 }
 
 std::vector<RaplMeasurement> RaplImpl::GetMeasurements() {
   std::lock_guard<std::mutex> lock(mutex_);
-
   std::vector<RaplMeasurement> measurements;
 
-  const std::size_t n = packages_names_.size();
-  assert(n == energy_fds_.size());
-  assert(n == uj_max_.size());
-
-  // Take all measurements
-  auto packages_name_it = packages_names_.begin();
-  for (const auto& energy_fd : energy_fds_) {
-    std::size_t measurement;
-    const std::size_t energy_value =
-        read_numerical_value<std::size_t>(energy_fd.fd());
-    measurements.emplace_back(RaplMeasurement{*packages_name_it, energy_value});
-    packages_name_it++;
-  }
-
-  for (std::size_t i = 0; i < measurements.size(); i++) {
-    const std::size_t uj_now = measurements[i].joules;
-    if (uj_now < uj_previous_[i]) {
-      uj_offset_[i] += uj_max_[i];
-    }
-    uj_previous_[i] = uj_now;
-    measurements[i].joules = uj_offset_[i] + uj_now - uj_first_[i];
+  for (auto& counter : rapl_counters_) {
+    measurements.emplace_back(counter.GetName(), counter.Read());
   }
 
   return measurements;
-}  // end Rapl::GetMeasurement
+}
 
 State RaplImpl::GetState() {
   std::vector<RaplMeasurement> measurements = GetMeasurements();
@@ -190,17 +123,17 @@ State RaplImpl::GetState() {
 
   for (std::size_t i = 0; i < measurements.size(); i++) {
     const std::string name = measurements[i].name;
-    const std::size_t joules_now = measurements[i].joules;
-    const std::size_t joules_previous = previous_measurements_[i].joules;
+    const std::size_t ujoules_now = measurements[i].ujoules;
+    const std::size_t ujoules_previous = previous_measurements_[i].ujoules;
     const double duration = seconds(previous_timestamp_, state.timestamp_);
-    const float joules_diff = (joules_now - joules_previous) * 1e-6;
+    const float joules_diff = (ujoules_now - ujoules_previous) * 1e-6;
     const float watt = joules_diff / duration;
     state.name_[i + 1] = name;
-    state.joules_[i + 1] = joules_now * 1e-6;
+    state.joules_[i + 1] = ujoules_now * 1e-6;
     state.watt_[i + 1] = watt;
 
     if (name.find("package") != std::string::npos) {
-      state.joules_[0] += joules_now * 1e-6;
+      state.joules_[0] += ujoules_now * 1e-6;
       state.watt_[0] += watt;
     }
   }
