@@ -2,18 +2,19 @@
 #include <vector>
 
 #include "AMDSMIImpl.h"
+#include "common/Exception.h"
 
 namespace {
-class AmdsmiError : public std::exception {
+class AmdsmiError : public pmt::Exception {
  public:
   explicit AmdsmiError(amdsmi_status_t result, const char *file, int line)
       : result_(result), file_(file), line_(line) {}
 
   const char *what() const noexcept override {
-    std::ostringstream oss;
-    oss << "AMDSMI call failed with status: " << result_ << " in " << file_
-        << " at line " << line_;
-    message_ = oss.str();
+    std::ostringstream message;
+    message << "AMDSMI call failed with status: " << result_ << " in " << file_
+            << " at line " << line_;
+    message_ = message.str();
     return message_.c_str();
   }
 
@@ -78,34 +79,16 @@ namespace pmt::amdsmi {
 
 AMDSMIImpl::AMDSMIImpl(const unsigned device_number) {
   processor_ = Initialize(device_number);
-
-  state_previous_ = GetAMDSMIState();
-  state_previous_.joules_ = 0;
 }
 
 AMDSMIImpl::~AMDSMIImpl() { checkAmdsmiCall(amdsmi_shut_down()); }
 
-AMDSMIState::operator State() {
+State AMDSMIImpl::GetState() {
   State state;
-  state.timestamp_ = timestamp_;
-  state.name_[0] = "device";
-  state.joules_[0] = joules_;
-  state.watt_[0] = watt_;
-  return state;
-}
-
-AMDSMIState AMDSMIImpl::GetAMDSMIState() {
-  AMDSMIState state;
   state.timestamp_ = GetTime();
-  state.watt_ = GetPower(processor_);
-  state.joules_ = state_previous_.joules_;
-  const float watt = (state.watt_ + state_previous_.watt_) / 2;
-  const double duration = seconds(state_previous_.timestamp_, state.timestamp_);
-  state.joules_ += watt * duration;
-  state_previous_ = state;
+  state.name_[0] = "device";
+  state.watt_[0] = GetPower(processor_);
   return state;
 }
-
-State AMDSMIImpl::GetState() { return GetAMDSMIState(); }
 
 }  // end namespace pmt::amdsmi

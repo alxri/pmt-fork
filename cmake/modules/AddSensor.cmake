@@ -26,6 +26,8 @@ macro(add_sensor)
     target_include_directories(${LIBRARY_NAME}
                                PRIVATE ${ADD_SENSOR_INCLUDE_DIRECTORIES})
   endif()
+  get_filename_component(PMT_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR} DIRECTORY)
+  target_include_directories(${LIBRARY_NAME} PRIVATE ${PMT_INCLUDE_DIR})
 
   # Link to the global scope
   install(FILES ${ADD_SENSOR_HEADER} DESTINATION include/pmt)

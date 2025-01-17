@@ -50,8 +50,9 @@ test-das6:
     - module load cuda/12.2.1
     - module list
   script:
-    - cmake -S . -B build ${CMAKE_OPTIONS} -DPMT_BUILD_NVML=ON -DPMT_BUILD_BINARY=ON
+    - cmake -S . -B build ${CMAKE_OPTIONS} -DPMT_BUILD_NVML=ON -DPMT_BUILD_BINARY=ON -DPMT_BUILD_TESTING=ON
     - make -C build
+    - CTEST_OUTPUT_ON_FAILURE=1 make -C build test
     - $(pwd)/build/bin/PMT --name rapl -- sleep 3
     - $(pwd)/build/bin/PMT --name nvml -- sleep 3
     - PYTHONPATH=$PYTHONPATH:$(pwd)/build/python/site-packages python3 ${CI_PROJECT_DIR}/python/demo.py

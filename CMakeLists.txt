@@ -26,6 +26,14 @@ find_package(Threads REQUIRED)
 # Enable compile commands (needed for iwyu)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Option to enable testing
+option(PMT_BUILD_TESTING "" OFF)
+
+if(${PMT_BUILD_TESTING})
+  enable_testing()
+  add_subdirectory(test)
+endif()
+
 # Options to disable implementations
 # that require external dependencies
 option(PMT_BUILD_CRAY "" OFF)
@@ -124,11 +132,19 @@ set_target_properties(
 # Replicate header file structure in binary directory
 file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/pmt")
 file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/pmt/common")
-file(CREATE_LINK "${CMAKE_CURRENT_SOURCE_DIR}/common/PMT.h"
-     "${PROJECT_BINARY_DIR}/pmt/common/PMT.h" SYMBOLIC)
+list(APPEND PMT_HEADER_FILES "common/PMT.h")
+list(APPEND PMT_HEADER_FILES "common/State.h")
+list(APPEND PMT_HEADER_FILES "common/Timestamp.h")
 foreach(PMT_HEADER_FILE ${PMT_HEADER_FILES})
   set(LINK_SRC "${CMAKE_CURRENT_SOURCE_DIR}/${PMT_HEADER_FILE}")
-  get_filename_component(LINK_DST ${PMT_HEADER_FILE} NAME)
+  # Strip the subdirectory from the header file path,
+  # except for header files from the 'common' subdirectory.
+  string(FIND "${PMT_HEADER_FILE}" "common" PREFIX_POSITION)
+  if(PREFIX_POSITION EQUAL 0)
+    set(LINK_DST ${PMT_HEADER_FILE})
+  else()
+    get_filename_component(LINK_DST ${PMT_HEADER_FILE} NAME)
+  endif()
   file(CREATE_LINK ${LINK_SRC} "${PROJECT_BINARY_DIR}/pmt/${LINK_DST}" SYMBOLIC)
 endforeach()
 

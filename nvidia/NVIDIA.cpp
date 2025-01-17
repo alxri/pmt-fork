@@ -16,13 +16,13 @@
 inline void __checkCudaCall(cudaError_t result, const char *const func,
                             const char *const file, int const line) {
   if (result != cudaSuccess) {
-    std::stringstream error;
-    error << "CUDA Error at " << file;
-    error << ":" << line;
-    error << " in function " << func;
-    error << ": " << cudaGetErrorString(result);
-    error << std::endl;
-    throw std::runtime_error(error.str());
+    std::ostringstream message;
+    message << "CUDA Error at " << file;
+    message << ":" << line;
+    message << " in function " << func;
+    message << ": " << cudaGetErrorString(result);
+    message << std::endl;
+    throw std::runtime_error(message.str());
   }
 }
 #endif

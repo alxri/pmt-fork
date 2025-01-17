@@ -40,16 +40,12 @@ namespace fs = std::filesystem;
 
 namespace pmt::rapl {
 
-RaplImpl::RaplImpl() {
-  Init();
-  previous_timestamp_ = GetTime();
-  previous_measurements_ = GetMeasurements();
-}
+RaplImpl::RaplImpl() { Init(); }
 
 RaplImpl::~RaplImpl() { std::lock_guard<std::mutex> lock(mutex_); }
 
 std::string GetBasename(int package_id) {
-  std::stringstream basename;
+  std::ostringstream basename;
   basename << "/sys/class/powercap/intel-rapl:" << package_id;
   return basename.str();
 }
@@ -91,7 +87,7 @@ void RaplImpl::Init() {
     try {
       rapl_counters_.emplace_back(rapl_dir);
     } catch (std::system_error& e) {
-      std::stringstream message;
+      std::ostringstream message;
       message << "OS error: " << e.what();
       std::cerr << message.str() << std::endl;
       if (e.code().value() == EACCES) {
@@ -118,28 +114,15 @@ State RaplImpl::GetState() {
   State state(1 + measurements.size());
   state.timestamp_ = GetTime();
   state.name_[0] = "total";
-  state.joules_[0] = 0;
-  state.watt_[0] = 0;
 
   for (std::size_t i = 0; i < measurements.size(); i++) {
-    const std::string name = measurements[i].name;
-    const std::size_t ujoules_now = measurements[i].ujoules;
-    const std::size_t ujoules_previous = previous_measurements_[i].ujoules;
-    const double duration = seconds(previous_timestamp_, state.timestamp_);
-    const float joules_diff = (ujoules_now - ujoules_previous) * 1e-6;
-    const float watt = joules_diff / duration;
-    state.name_[i + 1] = name;
-    state.joules_[i + 1] = ujoules_now * 1e-6;
-    state.watt_[i + 1] = watt;
+    state.name_[i + 1] = measurements[i].name;
+    state.joules_[i + 1] = measurements[i].ujoules * 1e-6;
 
-    if (name.find("package") != std::string::npos) {
-      state.joules_[0] += ujoules_now * 1e-6;
-      state.watt_[0] += watt;
+    if (measurements[i].name.find("package") != std::string::npos) {
+      state.joules_[0] += measurements[i].ujoules * 1e-6;
     }
   }
-
-  previous_timestamp_ = state.timestamp_;
-  previous_measurements_ = measurements;
 
   return state;
 }

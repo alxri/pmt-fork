@@ -64,7 +64,7 @@ void run(pmt::PMT& sensor, const std::vector<std::string>& command) {
       std::cout << std::endl;
     }
   } else {
-    std::stringstream command_stream;
+    std::ostringstream command_stream;
     for (int i = 1; i < command.size(); i++) {
       if (i > 1) {
         command_stream << " ";

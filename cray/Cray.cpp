@@ -7,6 +7,7 @@
 
 #include <ext/alloc_traits.h>
 
+#include "common/Exception.h"
 #include "Cray.h"
 #include "FilenamesHelper.h"
 
@@ -14,19 +15,19 @@ namespace {
 double GetPower(const std::string& filePath) {
   std::ifstream powerFile(filePath);
   if (!powerFile.is_open()) {
-    throw std::runtime_error("Failed to open power file");
+    throw pmt::Exception("Failed to open power file");
   }
 
   std::string line;
   if (!std::getline(powerFile, line)) {
-    throw std::runtime_error("Failed to read power value");
+    throw pmt::Exception("Failed to read power value");
   }
 
   double power;
   try {
     power = std::stod(line);
   } catch (const std::exception& e) {
-    throw std::runtime_error("Failed to parse power value");
+    throw pmt::Exception("Failed to parse power value");
   }
 
   powerFile.close();
@@ -46,9 +47,6 @@ class CrayImpl : public Cray {
   std::vector<std::string> filenames;
   std::string cray_pm_counters_path = "/sys/cray/pm_counters";
 
-  Timestamp previous_timestamp_;
-  std::vector<CrayMeasurement> previous_measurements_;
-
   // Mutex used to guard GetMeasurements()
   std::mutex mutex_;
 
@@ -67,9 +65,6 @@ CrayImpl::CrayImpl() {
 #if defined(DEBUG)
   filenames_helper::PrintFilenames(filenames);
 #endif
-
-  previous_timestamp_ = GetTime();
-  previous_measurements_ = GetMeasurements();
 }
 
 std::vector<CrayMeasurement> CrayImpl::GetMeasurements() {
@@ -95,14 +90,11 @@ State CrayImpl::GetState() {
   State state(measurements.size());
   state.timestamp_ = GetTime();
 
-  const double duration = seconds(previous_timestamp_, state.timestamp_);
+  const double duration = seconds(state_latest_, state);
 
   for (size_t i = 0; i < measurements.size(); i++) {
     state.name_[i] = measurements[i].name;
     state.watt_[i] = measurements[i].watt;
-    const double watt =
-        (measurements[i].watt + previous_measurements_[i].watt) / 2;
-    state.joules_[i] += watt * duration;
   }
 
   return state;

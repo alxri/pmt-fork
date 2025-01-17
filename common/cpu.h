@@ -10,6 +10,8 @@
 
 #include <unistd.h>
 
+#include "common/Exception.h"
+
 namespace pmt::common {
 
 std::vector<int> get_active_cpus() {
@@ -18,8 +20,7 @@ std::vector<int> get_active_cpus() {
 
   const int result = sched_getaffinity(0, sizeof(cpu_set), &cpu_set);
   if (result == -1) {
-    throw std::system_error(errno, std::generic_category(),
-                            "sched_getaffinity");
+    throw pmt::Exception("sched_getaffinity");
   }
 
   const int n_cpus = sysconf(_SC_NPROCESSORS_ONLN);
@@ -44,7 +45,9 @@ std::set<int> get_active_packages(const std::vector<int>& active_cpus) {
 
     std::ifstream file(path);
     if (!file.is_open()) {
-      throw std::runtime_error("Failed to open file: " + path);
+      std::ostringstream message;
+      message << "Failed to open file: " << path;
+      throw pmt::Exception(message.str().c_str());
     }
 
     int socket_id;

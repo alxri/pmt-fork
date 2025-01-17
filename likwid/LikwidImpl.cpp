@@ -106,8 +106,6 @@ LikwidImpl::LikwidImpl(std::string event_group_name)
       }
     }
   }
-
-  previous_time = GetTime();
 }  // end constructor
 
 LikwidImpl::~LikwidImpl() {
@@ -118,21 +116,16 @@ LikwidImpl::~LikwidImpl() {
 
 State LikwidImpl::GetState() {
   State state(nr_groups + 1);
+  state.name_[0] = "total";
   state.timestamp_ = GetTime();
 
-  const double duration = seconds(state.timestamp_, state.timestamp_);
-  double total_watts = 0;
+  const double duration = seconds(state_latest_, state);
   std::vector<double> current_measurements = GetMeasurements();
   for (int i = 0; i < nr_groups; i++) {
-    joulesTotal += current_measurements[i];
-    state.joules_[i + 1] = current_measurements[i];
+    state.name_[i] = "socket_" + std::to_string(i);
     state.watt_[i + 1] = current_measurements[i] / duration;
-    total_watts += state.watt_[i + 1];
+    state.watt_[0] += state.watt_[i + 1];
   }
-
-  state.joules_[0] = static_cast<float>(joulesTotal);
-  state.watt_[0] = total_watts;
-  previous_time = state.timestamp_;
 
   return state;
 }

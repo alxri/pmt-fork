@@ -13,9 +13,10 @@
 #include <ext/alloc_traits.h>
 #include <signal.h>
 
+#include "common/Exception.h"
 #include "TegraImpl.h"
 
-namespace detail {
+namespace {
 bool FileExists(const std::string& name) {
   if (FILE* file = fopen(name.c_str(), "r")) {
     fclose(file);
@@ -31,7 +32,7 @@ std::string Execute(const std::string& commandline) {
   std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(commandline.c_str(), "r"),
                                                 pclose);
   if (!pipe) {
-    throw std::runtime_error("popen() failed!");
+    throw pmt::Exception("popen() failed!");
   }
   while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
     result += buffer.data();
@@ -78,15 +79,17 @@ std::string FindLogfile() {
 std::string StartTegraStats(int interval) {
   char filename[32] = "/tmp/tegrastats-XXXXXX";
   if (mkstemp(filename) == -1) {
-    throw std::runtime_error("Could not create temporary file");
+    throw pmt::Exception("Could not create temporary file");
   }
   const char* binary = "/usr/bin/tegrastats";
-  std::stringstream commandline;
+  std::ostringstream commandline;
   commandline << binary << " --start --interval " << interval << " --logfile "
               << filename;
   std::string output = Execute(commandline.str());
   if (output.compare("") != 0) {
-    throw std::runtime_error("Error starting tegrastats: " + output);
+    std::ostringstream message;
+    message << "Error starting tegrastats: " << output;
+    throw pmt::Exception(message.str().c_str());
   }
   return filename;
 }
@@ -94,7 +97,7 @@ std::string StartTegraStats(int interval) {
 void StopTegraStats(const std::string& logfile) {
   if (logfile.compare("") != 0) {
     const char* binary = "/usr/bin/tegrastats";
-    std::stringstream commandline;
+    std::ostringstream commandline;
     commandline << binary << " --stop";
     Execute(commandline.str());
     std::remove(logfile.c_str());
@@ -145,8 +148,9 @@ std::vector<pmt::tegra::TegraMeasurement> ReadPowerMeasurements(
   return measurements;
 }
 
-bool CheckSensors(const std::vector<std::string>& sensors,
-                  std::vector<pmt::tegra::TegraMeasurement>& measurements) {
+bool CheckSensors(
+    const std::vector<std::string>& sensors,
+    const std::vector<pmt::tegra::TegraMeasurement>& measurements) {
   if (sensors.size() != measurements.size()) {
     return false;
   }
@@ -158,47 +162,44 @@ bool CheckSensors(const std::vector<std::string>& sensors,
   }
   return true;
 }
-}  // end namespace detail
+}  // end namespace
 
 namespace pmt::tegra {
 
 void SignalCallbackHandler(int num) {
-  const std::string logfile = detail::FindLogfile();
-  detail::StopTegraStats(logfile);
+  const std::string logfile = ::FindLogfile();
+  ::StopTegraStats(logfile);
   signal(SIGINT, SIG_DFL);
   raise(num);
 }
 
 TegraImpl::TegraImpl() {
-  filename_ = detail::FindLogfile();
-  if (!detail::FileExists(filename_)) {
-    detail::StopTegraStats(filename_);
-    filename_ = detail::StartTegraStats(measurement_interval_);
+  filename_ = ::FindLogfile();
+  if (!::FileExists(filename_)) {
+    ::StopTegraStats(filename_);
+    filename_ = ::StartTegraStats(measurement_interval_);
     started_tegrastats_ = true;
     signal(SIGINT, SignalCallbackHandler);
   }
-
-  previous_state_ = GetTegraState();
-  previous_state_.joules_ = 0;
 }
 
 TegraImpl::~TegraImpl() {
   if (started_tegrastats_) {
-    detail::StopTegraStats(filename_);
+    ::StopTegraStats(filename_);
     started_tegrastats_ = false;
   }
 }
 
 std::vector<TegraMeasurement> TegraImpl::GetMeasurements() {
-  std::string line = detail::ReadLastLine(filename_);
+  std::string line = ::ReadLastLine(filename_);
 
   while (line.compare("") == 0) {
     std::this_thread::sleep_for(
         std::chrono::milliseconds(measurement_interval_));
-    line = detail::ReadLastLine(filename_);
+    line = ::ReadLastLine(filename_);
   }
 
-  return detail::ReadPowerMeasurements(line);
+  return ::ReadPowerMeasurements(line);
 };
 
 const std::vector<std::string> sensors_agx_xavier{"GPU", "CPU",   "SOC",
@@ -210,55 +211,41 @@ const std::vector<std::string> sensors_jetson_nano{"POM_5V_IN", "POM_5V_GPU",
 const std::vector<std::string> sensors_jetson_orin_nano{
     "VDD_IN", "VDD_CPU_GPU_CV", "VDD_SOC"};
 
-TegraState::operator State() {
+State TegraImpl::GetState() {
+  const std::vector<TegraMeasurement> measurements = GetMeasurements();
   State state(1 + measurements.size());
-  state.timestamp_ = timestamp_;
-  state.name_[0] = "total";
-  state.joules_[0] = joules_ * 1e-3;
-  state.watt_[0] = watt_ * 1e-3;
-
-  for (size_t i = 0; i < measurements.size(); i++) {
-    const std::string name = measurements[i].first;
-    const double watt = double(measurements[i].second) / 1000;
-    state.name_[i + 1] = name;
-    state.watt_[i + 1] = watt;
-  }
-
-  return state;
-}
-
-TegraState TegraImpl::GetTegraState() {
-  TegraState state;
   state.timestamp_ = GetTime();
-  state.measurements = GetMeasurements();
+  state.name_[0] = "total";
 
   // Compute total power consumption as sum of individual measurements.
   // Which individual measurements to use differs per platform.
-  state.watt_ = 0;
-  if (detail::CheckSensors(sensors_agx_xavier, state.measurements)) {
+  state.watt_[0] = 0;
+  if (::CheckSensors(sensors_agx_xavier, measurements)) {
     // Jetson AGX Xavier: sum all sensors
-    for (auto& measurement : state.measurements) {
-      state.watt_ += measurement.second;
+    for (auto& measurement : measurements) {
+      state.watt_[0] += measurement.second;
     }
-  } else if (detail::CheckSensors(sensors_agx_orin, state.measurements)) {
+  } else if (::CheckSensors(sensors_agx_orin, measurements)) {
     // Jetson AGX Orin: sum all sensors
-    for (auto& measurement : state.measurements) {
-      state.watt_ += measurement.second;
+    for (auto& measurement : measurements) {
+      state.watt_[0] += measurement.second;
     }
-  } else if (detail::CheckSensors(sensors_jetson_nano, state.measurements)) {
+  } else if (::CheckSensors(sensors_jetson_nano, measurements)) {
     // Jetson Nano: POM_5V_IN only
-    state.watt_ += state.measurements[0].second;
-  } else if (detail::CheckSensors(sensors_jetson_orin_nano,
-                                  state.measurements)) {
+    state.watt_[0] += measurements[0].second;
+  } else if (::CheckSensors(sensors_jetson_orin_nano, measurements)) {
     // Jetson Nano: VDD_IN only
-    state.watt_ += state.measurements[0].second;
+    state.watt_[0] += measurements[0].second;
+  } else {
+    throw pmt::Exception("Unknown Jetson device.");
   }
-
-  const float watt = (state.watt_ + previous_state_.watt_) / 2;
-  const double duration = seconds(previous_state_.timestamp_, state.timestamp_);
-  state.joules_ = previous_state_.joules_ + (watt * duration);
-
-  previous_state_ = state;
+  for (size_t i = 0; i < measurements.size(); i++) {
+    const std::string name = measurements[i].first;
+    const double watt = measurements[i].second / 1.e3;
+    state.name_[i + 1] = name;
+    state.watt_[i + 1] = watt;
+  }
+  state.watt_[0] /= 1e3;
 
   return state;
 }

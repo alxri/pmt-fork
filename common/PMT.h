@@ -1,7 +1,6 @@
-#ifndef PMT_COMMON_H_
-#define PMT_COMMON_H_
+#ifndef PMT_PMT_H_
+#define PMT_PMT_H_
 
-#include <chrono>
 #include <fstream>
 #include <memory>
 #include <mutex>
@@ -9,43 +8,13 @@
 #include <thread>
 #include <vector>
 
+#include <pmt/common/State.h>
+#include <pmt/common/Timestamp.h>
+
 namespace pmt {
 
 const std::string kDumpFilenameVariable = "PMT_DUMP_FILE";
 const std::string kDumpIntervalVariable = "PMT_DUMP_INTERVAL";
-
-using Timestamp = std::chrono::high_resolution_clock::time_point;
-
-class State {
- public:
-  State &operator=(const State &state) {
-    timestamp_ = state.timestamp_;
-    nr_measurements_ = state.nr_measurements_;
-    name_ = state.name_;
-    joules_ = state.joules_;
-    watt_ = state.watt_;
-    return *this;
-  }
-
-  State(int nr_measurements = 1) : nr_measurements_(nr_measurements) {
-    name_.resize(nr_measurements);
-    joules_.resize(nr_measurements);
-    watt_.resize(nr_measurements);
-  }
-
-  int NrMeasurements() { return nr_measurements_; }
-
-  Timestamp timestamp() { return timestamp_; }
-  std::string name(int i);
-  float joules(int i);
-  float watts(int i);
-
-  Timestamp timestamp_;
-  int nr_measurements_;
-  std::vector<std::string> name_;
-  std::vector<float> joules_;
-  std::vector<float> watt_;
-};
 
 class PMT {
  public:
@@ -66,7 +35,9 @@ class PMT {
 
   virtual void Mark(const State &state, const std::string &message) const;
 
-  void SetMeasurementInterval(unsigned int milliseconds = 0);
+  void SetMeasurementInterval(unsigned int milliseconds) {
+    measurement_interval_ = milliseconds;
+  };
   unsigned int GetMeasurementInterval() const {
     return measurement_interval_;
   };                               // in milliseconds
@@ -83,24 +54,31 @@ class PMT {
 
   Timestamp GetTime();
 
- private:
-  unsigned int measurement_interval_ = 100;  // milliseconds
+  unsigned int measurement_interval_ = 1;  // milliseconds
 
-  // The last state set by the thread
+  // The last State returned by Read()
+  State state_returned_;
+
+  // The latest State returned by GetState()
   State state_latest_;
 
-  // This thread continuously call GetState to update state_latest_. It is
+ private:
+  // Wait up to this number of measurement intervals for the backend to
+  // initialize, which it signals by unlocking the thread_mutex_.
+  static constexpr int kNrRetriesInitialization = 10;
+
+  // This thread continuously calls GetState to update state_latest_. It is
   // started automatically upon the first Read() call.
   std::thread thread_;
   volatile bool thread_started_ = false;
   volatile bool thread_stop_ = false;
+  mutable std::mutex thread_mutex_;
 
   void StartThread();
   void StopThread();
 
   void DumpHeader(const State &state);
 
- protected:
   std::unique_ptr<std::ofstream> dump_file_ = nullptr;
   mutable std::mutex dump_file_mutex_;
 };
@@ -112,4 +90,4 @@ std::unique_ptr<PMT> Create(const std::string &name,
 
 std::ostream &operator<<(std::ostream &os, const pmt::Timestamp &timestamp);
 
-#endif
+#endif  // PMT_PMT_H_

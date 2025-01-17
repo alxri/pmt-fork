@@ -32,8 +32,6 @@ class RaplImpl : public Rapl {
 
   std::vector<RaplMeasurement> GetMeasurements();
 
-  Timestamp previous_timestamp_;
-  std::vector<RaplMeasurement> previous_measurements_;
   std::vector<RaplCounter> rapl_counters_;
 
   // Mutex used to guard GetMeasurements()

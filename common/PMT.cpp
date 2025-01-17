@@ -5,10 +5,13 @@
 #include <cstdlib>
 #include <cstring>
 #include <iomanip>
+#include <iostream>
 
 #include <pmt.h>
 
+#include "common/Exception.h"
 #include "common/PMT.h"
+
 namespace {
 template <typename T>
 bool isEqual(T x, T y) {
@@ -36,9 +39,9 @@ double PMT::seconds(const Timestamp &timestamp) {
 }
 
 double PMT::seconds(const Timestamp &first, const Timestamp &second) {
-  return std::chrono::duration_cast<std::chrono::microseconds>((second - first))
+  return std::chrono::duration_cast<std::chrono::microseconds>(second - first)
              .count() /
-         1.e6;
+         1e6;
 }
 
 double PMT::seconds(const State &first, const State &second) {
@@ -64,42 +67,61 @@ unsigned int PMT::GetDumpInterval() {
   }
 }
 
-std::string State::name(int i) {
-  assert(i < nr_measurements_);
-  return name_[i];
-}
-
-float State::joules(int i) {
-  assert(i < nr_measurements_);
-  return joules_[i];
-}
-
-float State::watts(int i) {
-  assert(i < nr_measurements_);
-  return watt_[i];
-}
-
 void PMT::StartThread() {
-  SetMeasurementInterval();
+  thread_mutex_.lock();
 
   thread_ = std::thread([&] {
-    State state_previous = GetState();
-    assert(state_previous.nr_measurements_ > 0);
-    state_latest_ = state_previous;
+    try {
+      state_latest_ = GetState();
+    } catch (const pmt::Exception &e) {
+#if defined(DEBUG)
+      std::cerr << "GetState(): " << e.what() << std::endl;
+#endif
+      throw pmt::Exception("Could not read initial state.");
+    }
 
     if (dump_file_) {
-      DumpHeader(state_previous);
+      DumpHeader(state_latest_);
     }
 
     while (!thread_stop_) {
       std::this_thread::sleep_for(
-          std::chrono::milliseconds(GetMeasurementInterval()));
-      state_latest_ = GetState();
+          std::chrono::milliseconds(measurement_interval_));
+
+      State state;
+      try {
+        state = GetState();
+      } catch (const pmt::Exception &e) {
+#if defined(DEBUG)
+        std::cerr << "GetState(): " << e.what() << std::endl;
+#endif
+        continue;
+      }
 
       if (dump_file_ &&
-          (1e3 * seconds(state_previous, state_latest_)) > GetDumpInterval()) {
-        Dump(state_latest_);
-        state_previous = state_latest_;
+          (1e3 * seconds(state_latest_, state)) > GetDumpInterval()) {
+        Dump(state);
+      }
+
+      for (int i = 0; i < state.NrMeasurements(); i++) {
+        const double seconds_diff = seconds(state_latest_, state);
+        if (state.watt_[i] > 0) {
+          const double watt_average =
+              (state_latest_.watt_[i] + state.watt_[i]) / 2.f;
+          state.joules_[i] =
+              state_latest_.joules_[i] + watt_average * seconds_diff;
+        } else if (state.joules_[i] > 0) {
+          const double joules_diff =
+              state.joules_[i] - state_latest_.joules_[i];
+          state.watt_[i] = joules_diff / seconds_diff;
+        }
+      }
+
+      state_latest_ = state;
+
+      if (!thread_started_) {
+        thread_mutex_.unlock();
+        thread_started_ = true;
       }
     }
   });
@@ -159,39 +181,38 @@ void PMT::Mark(const State &state, const std::string &message) const {
   }
 }
 
-void PMT::SetMeasurementInterval(unsigned int milliseconds) {
-  if (milliseconds > 0) {
-    measurement_interval_ = milliseconds;
-  } else {
-    unsigned int measurement_interval = 1;
-    State state_first;
-    State state_second;
-    do {
-      state_first = GetState();
-      std::this_thread::sleep_for(
-          std::chrono::milliseconds(measurement_interval));
-      state_second = GetState();
-      if (!isEqual(state_first.watt_[0], state_second.watt_[0])) {
-        measurement_interval_ = measurement_interval;
-        return;
-      } else {
-        measurement_interval *= 2;
-      }
-    } while (measurement_interval < 1000);
-  }
-}
-
 Timestamp PMT::GetTime() { return std::chrono::system_clock::now(); }
 
 State PMT::Read() {
   const int measurement_interval = GetMeasurementInterval();
   if (!thread_started_) {
     StartThread();
-    thread_started_ = true;
-    std::this_thread::sleep_for(
-        std::chrono::milliseconds(measurement_interval));
+
+    unsigned int retries = 0;
+
+    do {
+      std::this_thread::sleep_for(
+          std::chrono::milliseconds(measurement_interval));
+      if (retries++ > kNrRetriesInitialization) {
+        throw pmt::Exception("Measurement thread failed to start");
+      }
+    } while (!thread_mutex_.try_lock());
+
+    state_returned_ = state_latest_;
+    return state_latest_;
   }
-  return state_latest_;
+
+  State state = state_latest_;
+  if (seconds(state_returned_, state) <= 0) {
+    state = state_returned_;
+    state.timestamp_ = GetTime();
+    const double duration = seconds(state_returned_, state);
+    for (int i = 0; i < state.NrMeasurements(); i++) {
+      state.joules_[i] += state.watt_[i] * duration;
+    }
+  }
+
+  return state_returned_ = state;
 }
 
 std::unique_ptr<PMT> Create(const std::string &name,
@@ -285,9 +306,9 @@ std::unique_ptr<PMT> Create(const std::string &name,
   }
 
 #if defined(DEBUG)
-  std::stringstream error;
-  error << "Invalid or unavailable platform specified: " << name << std::endl;
-  throw std::runtime_error(error.str());
+  std::ostringstream message;
+  message << "Invalid or unavailable platform specified: " << name << std::endl;
+  throw pmt::Exception(message.str().c_str());
 #endif
 
   return Dummy::Create();

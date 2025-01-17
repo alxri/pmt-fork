@@ -9,6 +9,15 @@ namespace pmt {
 class Dummy : public PMT {
  public:
   static std::unique_ptr<Dummy> Create();
+  void UseFixedWatts(const std::vector<float>& watt) { watt_ = watt; }
+  void UseFixedJoules(const std::vector<float>& watt) {
+    fixed_joules_ = true;
+    watt_ = watt;
+  }
+
+ protected:
+  bool fixed_joules_ = false;
+  std::vector<float> watt_;
 };
 }  // end namespace pmt
 
