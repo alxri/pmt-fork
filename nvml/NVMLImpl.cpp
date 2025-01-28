@@ -38,11 +38,28 @@ NVMLImpl::NVMLImpl(cu::Device &device)
 void NVMLImpl::Initialize() {
   // Check whether the CPU+GPU scope is supported (e.g. Grace Hopper)
 #if not defined(PMT_NVML_LEGACY_MODE)
-  nvmlFieldValue_t values[1];
-  values[0].fieldId = kFieldIdPowerAverage;
-  values[0].scopeId = 1;
-  device_->getFieldValues(1, values);
-  nr_scopes_ = 1 + (values[0].nvmlReturn == NVML_SUCCESS);
+  // Initialize all field values
+  field_values_.resize(field_names_.size());
+  const size_t scope_count = field_names_.size() / field_ids_.size();
+  for (int i = 0; i < field_names_.size(); i++) {
+    field_values_[i].fieldId = field_ids_[i / scope_count];
+    field_values_[i].scopeId = i % scope_count;
+  }
+
+  // First call to getFieldValues, some may fail
+  device_->getFieldValues(field_names_.size(), field_values_.data());
+
+  // Remove all field values that failed. Remember which index
+  // should be reported first.
+  for (int i = 0; i < field_names_.size(); i++) {
+    if (field_values_[i].nvmlReturn != NVML_SUCCESS) {
+      field_names_.erase(field_names_.begin() + i);
+      field_values_.erase(field_values_.begin() + i);
+      i--;
+    } else if (field_names_[i].compare(kDefaultFieldName) == 0) {
+      default_field_id_ = i;
+    }
+  }
 #endif
 }
 
@@ -54,34 +71,27 @@ std::vector<NVMLMeasurement> NVMLImpl::GetMeasurements() {
 }
 #else
 std::vector<NVMLMeasurement> NVMLImpl::GetMeasurements() {
-  const int nr_field_ids = 2;
-  const int nr_measurements = nr_scopes_ * nr_field_ids;
-  nvmlFieldValue_t values[nr_measurements];
-  const unsigned int field_ids[] = {kFieldIdPowerInstant, kFieldIdPowerAverage};
+  std::vector<NVMLMeasurement> measurements;
+  device_->getFieldValues(field_values_.size(), field_values_.data());
 
-  std::vector<NVMLMeasurement> measurements(nr_measurements);
-
-  for (int i = 0; i < nr_measurements; i += nr_field_ids) {
-    const unsigned int scopeId = i / nr_field_ids;
-    values[i].fieldId = field_ids[0];
-    values[i].scopeId = scopeId;
-    values[i + 1].fieldId = field_ids[1];
-    values[i + 1].scopeId = scopeId;
+  if (field_values_[default_field_id_].nvmlReturn != NVML_SUCCESS) {
+    std::ostringstream message;
+    message << "The default field id '" << kDefaultFieldName
+            << "' is not available.";
+    throw pmt::Exception(message.str().c_str());
   }
 
-  device_->getFieldValues(nr_measurements, values);
-
-  const std::string scopeNames[] = {"gpu", "module"};
-  const std::string suffixes[] = {"_instant", "_average"};
-
-  for (int i = 0; i < nr_scopes_; ++i) {
-    for (int j = 0; j < nr_field_ids; ++j) {
-      int idx = nr_field_ids * i + j;
-      measurements[idx].name_ = scopeNames[i] + suffixes[j];
-      measurements[idx].milliwatt_ = values[idx].value.uiVal;
-      measurements[idx].timestamp_ =
-          Timestamp(std::chrono::microseconds(values[idx].timestamp));
+  for (int i = 0; i < field_values_.size(); i++) {
+    if (field_values_[i].nvmlReturn == NVML_SUCCESS) {
+      measurements.push_back({.name_ = field_names_[i],
+                              .milliwatt_ = field_values_[i].value.uiVal,
+                              .timestamp_ = Timestamp(std::chrono::microseconds(
+                                  field_values_[i].timestamp))});
     }
+  }
+
+  if (measurements.empty()) {
+    throw pmt::Exception("No measurements available.");
   }
 
   return measurements;
@@ -105,12 +115,9 @@ State NVMLImpl::GetState() {
   }
 
 #if !defined(PMT_NVML_LEGACY_MODE)
-  // Default: use the instantaneous GPU power
-  // Grace Hopper: use the instantaneous module power
-  const unsigned int measurement_id = nr_scopes_ == 1 ? 0 : 2;
-  std::swap(state.name_[0], state.name_[measurement_id]);
-  std::swap(state.watt_[0], state.watt_[measurement_id]);
-  state.timestamp_ = measurements[measurement_id].timestamp_;
+  std::swap(state.name_[0], state.name_[default_field_id_]);
+  std::swap(state.watt_[0], state.watt_[default_field_id_]);
+  state.timestamp_ = measurements[default_field_id_].timestamp_;
 #else
   state.timestamp_ = measurements[0].timestamp_;
 #endif
