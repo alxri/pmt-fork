@@ -11,12 +11,6 @@ class Device;
 }  // end namespace nvml
 namespace pmt::nvml {
 
-struct NVMLMeasurement {
-  std::string name_;
-  unsigned int milliwatt_;
-  Timestamp timestamp_;
-};
-
 class NVMLImpl : public NVML {
  public:
   NVMLImpl(int device_number);
@@ -29,8 +23,6 @@ class NVMLImpl : public NVML {
   State GetState() override;
 
   virtual const char* GetDumpFilename() override { return "/tmp/pmt_nvml.out"; }
-
-  std::vector<NVMLMeasurement> GetMeasurements();
 
 #if not defined(PMT_NVML_LEGACY_MODE)
   // The following power fields are exposed through NVML. Not all
