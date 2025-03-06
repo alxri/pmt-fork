@@ -192,7 +192,7 @@ State PMT::Read() {
 
     do {
       std::this_thread::sleep_for(
-          std::chrono::milliseconds(measurement_interval));
+          std::chrono::milliseconds(measurement_interval * (retries + 1)));
       if (retries++ > kNrRetriesInitialization) {
         throw pmt::Exception("Measurement thread failed to start");
       }
