@@ -24,10 +24,12 @@ RaplCounter::RaplCounter(const std::string& directory) {
 }
 
 std::size_t RaplCounter::Read() {
-  std::size_t energy_uj;
   assert(ifstream_energy_uj_.is_open());
-  ifstream_energy_uj_ >> energy_uj;
+  ifstream_energy_uj_.clear();
   ifstream_energy_uj_.seekg(0);
+  std::string line;
+  std::getline(ifstream_energy_uj_, line);
+  const std::size_t energy_uj = std::atol(line.c_str());
   energy_uj_offset_ +=
       energy_uj < energy_uj_previous_ ? max_energy_range_uj_ : 0;
   return energy_uj_offset_ + energy_uj - energy_uj_first_;
