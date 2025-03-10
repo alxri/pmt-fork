@@ -1,17 +1,13 @@
-#include <string>
 #include <vector>
 
-#include "Tegra.h"
 #include "common/PMT.h"
+#include "Powermon.h"
+#include "Tegra.h"
 
 namespace pmt::tegra {
-
-using TegraMeasurement = std::pair<std::string, int>;
-
 class TegraImpl : public Tegra {
  public:
   TegraImpl();
-  virtual ~TegraImpl();
 
   State GetState() override;
 
@@ -20,10 +16,8 @@ class TegraImpl : public Tegra {
   }
 
  private:
-  std::vector<TegraMeasurement> GetMeasurements();
+  std::vector<Powermon> powermons_;
 
-  std::string filename_ = "";
-  bool started_tegrastats_ = false;
   const int measurement_interval_ = 10;  // milliseconds
 };
 

@@ -13,6 +13,7 @@ add_sensor(
   SRC_FILES
   Tegra.cpp
   TegraImpl.cpp
+  Powermon.cpp
   LINK_LIBRARIES
   ${LINK_LIBRARIES}
   INCLUDE_DIRECTORIES
