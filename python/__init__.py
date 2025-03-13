@@ -69,3 +69,14 @@ def dump(platform, **kwargs):
         return wrapper
 
     return decorator
+
+def state_measurements(self):
+    nr_measurements = self.nr_measurements()
+    result = dict()
+    for i in range(nr_measurements):
+        name = self.name(i)
+        watts = self.watts(i)
+        result[name] = watts
+    return result
+
+pmt.State.measurements = state_measurements

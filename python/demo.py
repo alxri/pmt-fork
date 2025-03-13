@@ -1,15 +1,15 @@
 import time
 import pmt
 
+platform = "rapl"
 
-@pmt.measure("nvidia")
+@pmt.measure(platform)
 def my_kernel1():
     time.sleep(1)
 
 
 def my_kernel2():
-    platform = "nvidia"
-    pm = pmt.create(platform, 0)
+    pm = pmt.create(platform)
     start = pm.read()
     time.sleep(1)
     end = pm.read()
@@ -21,6 +21,12 @@ def my_kernel2():
     }
 
 
+def my_kernel3():
+    pm = pmt.create(platform)
+    state = pm.read()
+    return state.measurements()
+
 if __name__ == "__main__":
     print(my_kernel1())
     print(my_kernel2())
+    print(my_kernel3())
