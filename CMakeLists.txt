@@ -55,6 +55,7 @@ include(FetchContent)
 if(${PMT_BUILD_NVML} OR ${PMT_BUILD_TEGRA})
   set(PMT_BUILD_NVIDIA ON)
   find_package(CUDAToolkit REQUIRED)
+  set(CUDAWRAPPERS_COMPONENTS nvml)
   FetchContent_Declare(
     cudawrappers
     GIT_REPOSITORY https://github.com/nlesc-recruit/cudawrappers
