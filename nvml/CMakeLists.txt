@@ -3,7 +3,7 @@ project(pmt-nvml)
 find_package(CUDAToolkit REQUIRED)
 
 option(PMT_NVML_LEGACY_MODE "Build NVML in legacy mode" OFF)
-option(PMT_NVML_CUDAWRAPPERS_API "Build NVML with cudawrappers API" OFF)
+option(PMT_CUDAWRAPPERS_API "Build NVML with cudawrappers API" OFF)
 
 if(CUDAToolkit_VERSION VERSION_LESS 12.0)
   set(PMT_NVML_LEGACY_MODE ON)
@@ -27,6 +27,6 @@ if(${PMT_NVML_LEGACY_MODE})
   target_compile_definitions(pmt-nvml PRIVATE PMT_NVML_LEGACY_MODE)
 endif()
 
-if(${PMT_NVML_CUDAWRAPPERS_API})
-  target_compile_definitions(pmt-nvml PRIVATE PMT_NVML_CUDAWRAPPERS_API)
+if(${PMT_CUDAWRAPPERS_API})
+  target_compile_definitions(pmt-nvml PRIVATE PMT_CUDAWRAPPERS_API)
 endif()

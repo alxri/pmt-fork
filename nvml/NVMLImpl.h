@@ -14,7 +14,7 @@ namespace pmt::nvml {
 class NVMLImpl : public NVML {
  public:
   NVMLImpl(int device_number);
-#if defined(PMT_NVML_CUDAWRAPPERS_API)
+#if defined(PMT_CUDAWRAPPERS_API)
   NVMLImpl(cu::Device& device);
 #endif
 

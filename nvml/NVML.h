@@ -4,7 +4,7 @@
 #include <memory>
 #include <string_view>
 
-#if defined(PMT_NVML_CUDAWRAPPERS_API)
+#if defined(PMT_CUDAWRAPPERS_API)
 #include <cudawrappers/cu.hpp>
 #endif
 
@@ -15,7 +15,7 @@ class NVML : public PMT {
  public:
   constexpr static inline std::string_view name = "nvml";
   static std::unique_ptr<NVML> Create(int device_number = 0);
-#if defined(PMT_NVML_CUDAWRAPPERS_API)
+#if defined(PMT_CUDAWRAPPERS_API)
   static std::unique_ptr<NVML> Create(cu::Device& device);
 #endif
 };

@@ -28,7 +28,7 @@ NVMLImpl::NVMLImpl(int device_number) {
   Initialize();
 }
 
-#if defined(PMT_NVML_CUDAWRAPPERS_API)
+#if defined(PMT_CUDAWRAPPERS_API)
 NVMLImpl::NVMLImpl(cu::Device &device)
     : device_(std::make_unique<::nvml::Device>(device)) {
   Initialize();

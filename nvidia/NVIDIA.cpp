@@ -44,4 +44,19 @@ std::unique_ptr<PMT> NVIDIA::Create(int device_number) {
   throw std::runtime_error("Neither Tegra nor NVML are available.");
 }
 
+#if defined(PMT_CUDAWRAPPERS_API)
+std::unique_ptr<PMT> NVIDIA::Create(cu::Device &device) {
+#if defined(PMT_BUILD_TEGRA)
+  if (device.getAttribute(CU_DEVICE_ATTRIBUTE_INTEGRATED)) {
+    return tegra::Tegra::Create();
+  }
+#endif
+#if defined(PMT_BUILD_NVML)
+  return nvml::NVML::Create(device);
+#endif
+
+  throw std::runtime_error("Neither Tegra nor NVML are available.");
+}
+#endif
+
 }  //  end namespace pmt::nvidia

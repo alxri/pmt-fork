@@ -9,6 +9,7 @@ for each release:
 ### Changed:
 
 - Set NVML device by UUID
+- Rename `PMT_NVML_CUDAWRAPPERS_API` to `PMT_CUDAWRAPPERS_API`
 
 ## 1.3.1
 
