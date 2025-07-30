@@ -18,7 +18,7 @@ const std::string kDumpIntervalVariable = "PMT_DUMP_INTERVAL";
 
 class PMT {
  public:
-  virtual ~PMT();
+  ~PMT();
 
   static double seconds(const Timestamp &timestamp);
 
