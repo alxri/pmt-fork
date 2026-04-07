@@ -57,7 +57,7 @@ State TegraImpl::GetState() {
   for (int i = 0; i < powermons_.size(); i++) {
     state.name_[i + 1] = powermons_[i].name();
     state.watt_[i + 1] = powermons_[i].read();
-    state.watt_[0] += state.watt_[i];
+    state.watt_[0] += state.watt_[i + 1];
   }
 
   return state;

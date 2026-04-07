@@ -12,13 +12,16 @@ PowerSensor3Impl::PowerSensor3Impl(const char *device)
 State PowerSensor3Impl::GetState() {
   const ::PowerSensor3::State measurement = powersensor_->read();
 
-  State state(::PowerSensor3::MAX_PAIRS);
-  state.name_ = pair_names_;
+  State state(1 + ::PowerSensor3::MAX_PAIRS);
+  state.name_[0] = "total";
   state.timestamp_ = measurement.timeAtRead;
 
-  for (size_t i = 0; i < state.nr_measurements_; i++) {
-    state.watt_[i] = measurement.voltage[i] * measurement.current[i];
-    state.joules_[i] = measurement.consumedEnergy[i];
+  for (size_t i = 0; i < pair_names_.size(); i++) {
+    state.name_[i + 1] = pair_names_[i];
+    state.watt_[i + 1] = measurement.voltage[i] * measurement.current[i];
+    state.joules_[i + 1] = measurement.consumedEnergy[i];
+    state.watt_[0] += state.watt_[i + 1];
+    state.joules_[0] += state.joules_[i + 1];
   }
 
   return state;
