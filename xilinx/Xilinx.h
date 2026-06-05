@@ -13,8 +13,7 @@ class Xilinx : public PMT {
   static std::unique_ptr<Xilinx> Create(
       const char *device = default_device().c_str());
   static std::string default_device() {
-    return "/sys/devices/pci0000:a0/0000:a0:03.1/0000:a1:00.0/hwmon/hwmon3/"
-           "power1_input";
+    return "/sys/class/hwmon/hwmon0/power1_input";
   }
 };
 }  // end namespace pmt::xilinx

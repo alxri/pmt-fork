@@ -1,5 +1,6 @@
 #include "Xilinx.h"
 
+#include <fstream>
 #include <istream>
 #include <sstream>
 #include <stdexcept>
@@ -12,9 +13,7 @@
 #include "common/Exception.h"
 
 namespace {
-float GetPower(std::string &filename) {
-  // Open power file, e.g.
-  // /sys/devices/pci0000:a0/0000:a0:03.1/0000:a1:00.0/hwmon/hwmon3/power1_input
+float GetPower(const std::string &filename) {
   std::ifstream file(filename, std::ios::in | std::ios::binary);
   if (errno != 0) {
     std::ostringstream message;
@@ -22,7 +21,6 @@ float GetPower(std::string &filename) {
     throw pmt::Exception(message.str().c_str());
   }
 
-  // This file has one line with instantenous power consumption in uW
   size_t power;
   file >> power;
   return power;
@@ -39,26 +37,44 @@ class XilinxImpl : public Xilinx {
   State GetState() override;
 
   virtual const char *GetDumpFilename() override {
-    return "/tmp/pmt_xilinx.out";
+    return "/tmp/pmt_zcu104.out";
   }
-
-  std::string filename_;
 };
 
 std::unique_ptr<Xilinx> Xilinx::Create(const char *device) {
   return std::make_unique<XilinxImpl>(device);
 }
 
-XilinxImpl::XilinxImpl(const char *device) {
-  char *pmt_device = getenv("PMT_DEVICE");
-  filename_ = pmt_device ? pmt_device : device;
-}
+ XilinxImpl::XilinxImpl(const char *device) {}
+//   char *pmt_device = getenv("PMT_DEVICE");
+//   filename_ = pmt_device ? pmt_device : device;
+// }
 
 State XilinxImpl::GetState() {
   State state;
   state.timestamp_ = GetTime();
-  state.name_[0] = "device";
-  state.watt_[0] = ::GetPower(filename_) * 1e-6;
+
+  // 1. Read from ZCU104 (in uW, convert to W)
+  double core_watts  = ::GetPower("/sys/class/hwmon/hwmon0/power1_input") * 1e-6;
+  double aux_watts   = ::GetPower("/sys/class/hwmon/hwmon1/power1_input") * 1e-6;
+  double board_watts = ::GetPower("/sys/class/hwmon/hwmon2/power1_input") * 1e-6;
+
+  // 2. CORE+LOGIC
+  state.name_.push_back("CORE_LOGIC");
+  state.watt_.push_back(core_watts);
+
+  // 3. AUXILIARY (e.g., DRAM, PCIe, etc.)
+  state.name_.push_back("AUX");
+  state.watt_.push_back(aux_watts);
+
+  // 4. TOTAL FPGA (SUM CORE + AUX)
+  state.name_.push_back("FPGA_TOTAL");
+  state.watt_.push_back(core_watts + aux_watts);
+
+  // 5. TOTAL FPGA BOARD 
+  state.name_.push_back("BOARD");
+  state.watt_.push_back(board_watts);
+
   return state;
 }
 
